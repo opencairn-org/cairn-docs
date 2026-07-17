@@ -1,0 +1,60 @@
+---
+id: configuration
+title: Configuration
+sidebar_position: 2
+---
+
+# Configuration
+
+All configuration is via environment variables prefixed with **`CAIRN_`**.
+Each subsystem has its own group (`CAIRN_<GROUP>_<KEY>`), processed in one pass
+at startup. Below are the variables you'll most often set; defaults in
+parentheses.
+
+## Core
+
+| Variable | Notes |
+| --- | --- |
+| `CAIRN_DATABASE_URL` | **required** — `postgres://user:pass@host:5432/cairn` |
+| `CAIRN_DATABASE_AUTO_MIGRATE` | run goose migrations on boot (`false`) |
+| `CAIRN_HTTP_ADDR` | listen address (`0.0.0.0:8080`) |
+| `CAIRN_HTTP_PUBLIC_BASE_URL` | external URL — used for OAuth/redirects/federation (`http://localhost:8080`) |
+| `CAIRN_HTTP_CORS_ALLOWED_ORIGINS` | comma-separated origins for browser clients |
+| `CAIRN_HTTP_TLS_CERT_FILE` / `..._TLS_KEY_FILE` | terminate TLS in-process (or use a proxy) |
+
+## Auth
+
+| Variable | Notes |
+| --- | --- |
+| `CAIRN_AUTH_SESSION_SECRET` | secret for session/token signing — set a long random value |
+
+See [OAuth & MCP](/integrations/oauth) for the authorization-server settings
+(scopes, token lifetimes, dynamic client registration).
+
+## NATS (control plane)
+
+| Variable | Notes |
+| --- | --- |
+| `CAIRN_NATS_URL` | `nats://nats:4222` |
+| `CAIRN_NATS_CLUSTER_NAME` | optional guard against pointing at the wrong cluster |
+| `CAIRN_NATS_CREDS_FILE` / `CAIRN_NATS_USERNAME` / `CAIRN_NATS_PASSWORD` | credentials (prod: nkey/JWT creds file) |
+
+## Storage (S3-compatible, optional)
+
+| Variable | Notes |
+| --- | --- |
+| `CAIRN_STORAGE_ENDPOINT` | e.g. `https://minio.local` |
+| `CAIRN_STORAGE_BUCKET` | bucket name (`cairn`) |
+| `CAIRN_STORAGE_ACCESS_KEY_ID` / `..._SECRET_ACCESS_KEY` | when both empty, core runs without blob storage |
+
+## Other groups
+
+`CAIRN_EMAIL_*` (SMTP for verification/reset), `CAIRN_INSTANCE_*` (name,
+bootstrap admin, invite policy), `CAIRN_LOG_*`, `CAIRN_SCHEDULER_*`,
+`CAIRN_GEOCODER_*`, `CAIRN_QUOTA_MAX_ACTIVITIES_PER_USER`, and
+`CAIRN_FEDERATION_ENABLED` for ActivityPub.
+
+:::tip
+Start from `dev.env.example` in `cairn-core` — it lists every variable with
+sane local defaults.
+:::

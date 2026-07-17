@@ -1,0 +1,212 @@
+---
+id: provider-contract
+title: Provider contract
+sidebar_position: 4
+---
+
+# Provider worker contract
+
+Every provider worker (strava, garmin, yours) is a standalone process in its
+own repo — see [Provider workers](/architecture/workers). The **only**
+contract with cairn-core is:
+
+1. the protobuf messages in `cairn.worker.v1` (committed stubs in each worker
+   repo), and
+2. the NATS subjects + behaviors specified here.
+
+This page is normative: **MUST** items are required for a worker to be
+compliant — core's scheduler, import queue, and UI assume them. Run the
+conformance harness ([§10](#10-conformance-harness)) against a live worker to
+verify mechanically.
+
+Wire conventions: job payloads (server → worker) are hand-rolled JSON;
+results (worker → server) are protojson-encoded `cairn.worker.v1.JobResult`.
+All job subjects live on the `CAIRN_JOBS` work-queue stream; all result
+subjects on the `CAIRN_RESULTS` interest stream — see
+[the pipeline](/architecture/pipeline).
+
+## 1. Identity and connection
+
+- The worker connects to NATS with an enrollment token (production,
+  auth-callout) or static/anonymous credentials (dev).
+- Identity triple: **provider** (e.g. `garmin`), **package** (stable build
+  identity, e.g. `cairn.workers.garmin`), **version** (incrementing integer).
+  Together they form core's update-available / re-parse-eligibility key.
+  Every published `JobResult` MUST carry `worker_name`, `worker_version`,
+  `worker_package`.
+
+## 2. Presence heartbeat — MUST
+
+Write a JSON presence record to the `cairn_worker_presence` KV bucket every
+~20s under the key `<worker_name>.<instance_id>`:
+
+```json
+{"worker_name": "...", "worker_key": "...", "instance_id": "...",
+ "version": "...", "provider": "...", "package": "...",
+ "webhooks": false, "capabilities": {...}, "last_seen": "<RFC3339>"}
+```
+
+Core uses presence for the worker-admin UI, connect-flow gating, and
+manage-view liveness.
+
+## 3. Job consumption — MUST
+
+Create a **durable pull consumer** on `CAIRN_JOBS` for **every** job subject
+of your provider that core publishes:
+
+| Subject | Required | Purpose |
+|---|---|---|
+| `cairn.jobs.fetch_source.<provider>` | MUST | import one activity |
+| `cairn.jobs.reconcile.<provider>` | MUST | catch new activity since watermark |
+| `cairn.jobs.parse_blob.<provider>` | MUST if raw blobs are archived | quota-free re-parse |
+| `cairn.jobs.import_metrics.<provider>` | MUST if manifest declares METRIC events | health metrics |
+| `cairn.jobs.backfill.<provider>` | MAY | legacy full-history walk |
+
+:::warning Why "every subject" is a MUST
+`CAIRN_JOBS` is a work-queue stream — messages for a subject nobody consumes
+are retained forever. Live incident: the garmin worker shipped without a
+reconcile consumer; the scheduler's per-minute reconcile publishes
+accumulated 2,779 messages in two days and new activities were never
+auto-imported.
+:::
+
+**Ack discipline** (the delivery semantics core assumes):
+
+- Success → **ack**.
+- Transient failure (network, 5xx, DB blip) → **NAK**; provider rate limit →
+  **NAK with delay** anchored to the limit window.
+- Poison (bad payload, activity gone, unmappable data) → publish a **failure
+  envelope** ([§6](#6-failure-envelope--must)) then **Term**.
+- Long-running handling MUST extend the ack deadline (`in_progress`) on a
+  cadence below the consumer AckWait (2 min): heartbeat every fetched message
+  from batch arrival until its disposition. Live incident: without this,
+  redelivery mid-processing re-imported one activity every 6 minutes for 20h.
+- Bound retries: Term (with failure envelope) after ~5 deliveries of a
+  persistently failing job rather than NAK-looping forever.
+
+## 4. Job payloads (server → worker, JSON)
+
+`fetch_source`:
+
+```json
+{"job_id": "…", "account_id": "<external_account uuid>", "user_id": "<uuid>",
+ "provider": "…", "ext_id": "…", "fetch_streams": true,
+ "reason": "backfill|webhook|reconcile"}
+```
+
+`reconcile`:
+
+```json
+{"job_id": "…", "account_id": "…", "user_id": "…", "provider": "…",
+ "watermark": "<RFC3339, optional>", "max_enqueue": 500,
+ "known_ext_ids": ["…", "…"]}
+```
+
+`parse_blob`: as `fetch_source` plus
+`"blob": {"url": "<presigned GET>", "expires_at": "…", "fallback_handle": "<blob key>"}`
+— on an expired URL, re-presign via `cairn.blobs.presign_download.<provider>`
+with the fallback handle.
+
+## 5. Results — claim-check — MUST
+
+Results are protojson `JobResult` published to
+`cairn.results.<job_type>.<provider>`.
+
+**Event-carrying results MUST be claim-checked** (streams routinely exceed
+the broker's `max_payload`; inline oversized publishes used to Term and wedge
+the import queue):
+
+1. Marshal the full `JobResult` (protojson).
+2. Request a presigned PUT via `cairn.blobs.presign_upload.<provider>` with
+   `"kind": "result"`, `content_type`, `content_length` and the **hex**
+   `content_sha256` of the body.
+3. PUT the body to the returned URL, sending `required_headers` **verbatim**.
+4. Publish only the envelope: worker stamp + `new_watermark`/`more_available`
+   + `payload_ref {blob_id, size_bytes, content_type, content_sha256}`, no
+   inline events. Core fetches the object, ingests, and deletes it; a bucket
+   lifecycle rule reaps orphans after ~1 day.
+
+Event-free results (reconcile watermark, backfill stamps) publish inline.
+
+Presign/upload failures are **transient** (NAK + retry) — never drop a
+result body silently.
+
+**Message-ids** (JetStream dedup): activity results
+`result:<job_id>:d<delivery_attempt>` (the attempt suffix lets a deferred
+retry re-publish past the dedup window; ingest is idempotent), reconcile
+results `result:<job_id>`, fetch_source sub-jobs enqueued by reconcile
+`reconcile:<provider>:<account_id>:<ext_id>`.
+
+**Stream hygiene — SHOULD:** emit strictly unique, ordered sample
+timestamps. Core dedupes defensively (last sample wins), but two live
+incidents (garmin + strava, duplicated provider rows around pauses) show
+providers do ship duplicates — clean them at the source.
+
+## 6. Failure envelope — MUST
+
+Before Terming a job that can never succeed, publish a small `JobResult`
+carrying only:
+
+- `error`: `WorkerError {class, code, message}` (no events), and
+- `failed_ref`: `ExternalRef {user_id, provider, external_account_id,
+  external_id}` for import-queue correlation.
+
+Core fails the queue item immediately with the true reason. Without it the
+item sits `in_progress` until the stale reaper masks the cause as
+`stale: no result after N dispatch attempts`.
+
+## 7. Reconcile behavior — MUST
+
+- Window: list from `max(watermark − 1h, now − 30d)` — never the full
+  history (that is the user-driven import queue's job).
+- Enqueue `fetch_source` sub-jobs for unknown ext-ids, capped by
+  `max_enqueue`, with the deterministic msg-ids above.
+- Publish the result to the **account-suffixed** subject
+  `cairn.results.reconcile.<provider>.<external_account_id>` — and publish it
+  **even when nothing new was found**. Advancing `last_sync_at` is what stops
+  the scheduler from re-polling the account every tick; core also applies
+  `new_watermark` (advance-only) from it.
+- The scheduler's target cadence is `CAIRN_SCHEDULER_POLLING_INTERVAL`
+  (default 60m, per-connection override). Workers SHOULD coalesce reconcile
+  jobs per account (~10 min) so a scheduler backlog drains as cheap acks.
+
+## 8. Discover — MUST
+
+Respond to plain request/reply on `cairn.discover.<provider>`:
+
+Request: `{"account_id": "…", "start_page": 1}`
+Reply: `{"items": [{"item_type": "activity", "external_id": "…",
+"item_time": "<RFC3339>"}], "next_page": 2}` — or `"complete": true` at the
+end, `"rate_limited": true` when the budget is exhausted mid-walk, or
+`{"error": "…"}`. Never return an empty success when the real cause was an
+error or rate limit — the UI would show "0 importable activities".
+
+## 9. Credentials & rate limits
+
+- Fetch credentials fresh per job over request/reply — OAuth providers:
+  `cairn.tokens.<provider>.get` (+ `.store`, `.needs_reauth`); custom-cred
+  providers: `cairn.creds.<provider>.get`. Never persist credentials in the
+  worker beyond in-memory caches.
+- Workers hold **zero** S3 credentials — all blob I/O goes through presigned
+  URLs (§4/§5).
+- Rate-limited providers: reserve from the shared budget KV
+  (`cairn_rate_limits`) before each API call, sync the limiter from the
+  provider's usage headers on every response, anchor 429 backoff to the real
+  window reset, and report `RateLimitSnapshot`s opportunistically.
+
+## 10. Conformance harness
+
+`cairn-core` ships a checker that verifies the mechanical parts of this
+contract against a **running** worker on a dev/staging NATS:
+
+```bash
+# from a cairn-core checkout
+go run ./cmd/worker-conformance --nats nats://localhost:4222 --provider garmin
+```
+
+It asserts: presence heartbeat exists and is fresh; durable consumers exist
+on `CAIRN_JOBS` for every required subject (catches the §3 incident class);
+discover answers with a valid shape; and (with `--active`) a synthetic
+reconcile job round-trips to an account-suffixed result. Non-zero exit on
+any violation — wire it into the provider repo's CI against its dev stack
+where possible.

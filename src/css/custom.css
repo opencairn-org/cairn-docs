@@ -1,0 +1,63 @@
+/**
+ * Cairn docs theme — Summit Teal on slate, matching the web UI + marketing site.
+ */
+
+:root {
+  /* Summit Teal primary (light mode) */
+  --ifm-color-primary: #0d9488;
+  --ifm-color-primary-dark: #0c857a;
+  --ifm-color-primary-darker: #0b7d73;
+  --ifm-color-primary-darkest: #09675f;
+  --ifm-color-primary-light: #0ea396;
+  --ifm-color-primary-lighter: #0fab9d;
+  --ifm-color-primary-lightest: #14c2b2;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(13, 148, 136, 0.12);
+  --ifm-font-family-base: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Dark mode: lighter teal + slate surfaces to match the app. */
+[data-theme='dark'] {
+  --ifm-color-primary: #2dd4bf;
+  --ifm-color-primary-dark: #20cbb5;
+  --ifm-color-primary-darker: #1ec0ab;
+  --ifm-color-primary-darkest: #189e8d;
+  --ifm-color-primary-light: #4ddbc9;
+  --ifm-color-primary-lighter: #5fdfcf;
+  --ifm-color-primary-lightest: #86e8db;
+
+  --ifm-background-color: #0b1220;
+  --ifm-background-surface-color: #0f172a;
+  --ifm-navbar-background-color: rgba(11, 18, 32, 0.85);
+  --ifm-footer-background-color: #0a0f1c;
+  --ifm-card-background-color: #131f33;
+  --ifm-color-content: #e2e8f0;
+  --ifm-color-content-secondary: #94a3b8;
+  --ifm-toc-border-color: #1f2c40;
+  --ifm-hr-border-color: #1f2c40;
+  --docusaurus-highlighted-code-line-bg: rgba(45, 212, 191, 0.14);
+}
+
+[data-theme='dark'] .navbar {
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #1f2c40;
+}
+
+/* Hero / homepage banner uses the teal gradient. */
+.hero--primary {
+  --ifm-hero-background-color: transparent;
+  background: radial-gradient(60% 120% at 75% -10%, rgba(20, 184, 166, 0.18), transparent 70%),
+    linear-gradient(180deg, #0f172a, #0b1220);
+  color: #e2e8f0;
+}
+.hero--primary .hero__title {
+  letter-spacing: -0.02em;
+}
+.hero--primary .hero__subtitle {
+  color: #94a3b8;
+}
+
+/* Subtle teal lift on cards/admonitions. */
+[data-theme='dark'] .card {
+  border: 1px solid #1f2c40;
+}

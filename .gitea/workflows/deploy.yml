@@ -1,0 +1,68 @@
+# CI — build the Docusaurus site on every branch and PR so breakage
+# is caught early.
+# NOTE: deployment is currently DISABLED (if: false below) until the public
+# launch; once enabled it rsyncs to the static web host on push to main.
+#
+# Deploy secrets (all host-specific values live in the CI secret store):
+#   DEPLOY_SSH_PASSWORD, DEPLOY_SSH_HOST, DEPLOY_SSH_USER, DEPLOY_PATH
+
+name: Build and deploy
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build # canonical URL comes from docusaurus.config.js
+
+      - name: Install rsync + sshpass
+        # Deploy disabled until the public launch. To re-enable, replace the
+        # line below with:
+        # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: ${{ false }}
+        run: |
+          if ! command -v rsync >/dev/null || ! command -v sshpass >/dev/null; then
+            apt-get update -qq
+            apt-get install -y rsync sshpass
+          fi
+
+      - name: Upload to web host
+        # Deploy disabled until the public launch. To re-enable, replace the
+        # line below with:
+        # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: ${{ false }}
+        env:
+          SSHPASS: ${{ secrets.DEPLOY_SSH_PASSWORD }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          sshpass -e rsync -avz --delete \
+            --chmod=D755,F644 \
+            -e "ssh -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no" \
+            build/ \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH"

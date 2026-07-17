@@ -1,0 +1,61 @@
+---
+id: providers
+title: Providers (Strava & Garmin)
+sidebar_position: 3
+---
+
+# Providers
+
+Each provider is a **separate worker process** in its own repository. Core never
+imports worker code — the contract is the proto messages + the NATS subjects
+(see [Provider workers](/architecture/workers)). You run only the workers you
+need.
+
+## Enrollment
+
+In production a worker authenticates to NATS with a one-time **enrollment
+token** (NATS auth-callout mints scoped credentials). Create one as an admin:
+
+```bash
+curl -X POST https://cairn.example/admin/worker-enrollments \
+  -H "Authorization: Bearer <admin token>" \
+  -d '{ "worker_name_pattern": "strava-*" }'
+```
+
+Pass the returned token to the worker as `CAIRN_WORKER_ENROLLMENT_TOKEN`.
+
+## Strava (Go)
+
+Repo: **cairn-provider-strava**. Strava is read-only for Cairn. Each user brings
+their own Strava API app (per-user OAuth) for rate-limit isolation and webhook
+ownership; users connect their account from the **Connections** screen.
+
+```bash
+docker run --rm \
+  -e CAIRN_NATS_URL=nats://nats:4222 \
+  -e CAIRN_WORKER_NAME=strava-fetcher \
+  -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
+  ghcr.io/johnnycube/cairn-provider-strava:latest
+```
+
+Only one Strava worker instance should own the webhook subject — set
+`CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` on exactly one.
+
+## Garmin (Python)
+
+Repo: **cairn-provider-garmin**. Garmin has no public activity OAuth API, so the
+worker uses the `garminconnect` library (Garth SSO). Per-user credentials are
+delivered over NATS.
+
+```bash
+docker run --rm \
+  -e CAIRN_NATS_URL=nats://nats:4222 \
+  ghcr.io/johnnycube/cairn-provider-garmin:latest
+```
+
+## Writing your own provider
+
+A provider only needs to: register via enrollment, consume
+`cairn.jobs.*.<provider>`, and publish `cairn.worker.v1.JobResult` events. Use
+the committed proto stubs (Go or Python) as your contract. See
+[Provider workers](/architecture/workers).

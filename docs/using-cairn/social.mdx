@@ -1,0 +1,34 @@
+---
+id: social
+title: Social & federation
+sidebar_position: 5
+---
+
+# Social & federation
+
+Cairn includes a full social layer:
+
+- **Follow** other users and see their activities in your **feed**.
+- **Profiles** with public/follower/private visibility.
+- **Kudos** and **comments** on activities.
+- **Clubs** with membership and **moderation** tools.
+- **Sharing** via unguessable share links for individual activities.
+
+## Visibility
+
+Every non-owner read goes through a single visibility choke-point. Owners see
+their own activities directly; everyone else sees only what your visibility
+settings project to them. This keeps private data private regardless of which
+endpoint is used.
+
+## ActivityPub federation (optional, beta)
+
+:::caution Beta
+Federation is currently **beta**: the protocol surface and remote-instance
+compatibility may still change between releases. Expect rough edges before
+enabling it on an instance you care about.
+:::
+
+Enable `CAIRN_FEDERATION_ENABLED` to let your instance federate over
+ActivityPub — follow and be followed across Cairn (and other compatible)
+instances. It's off by default.

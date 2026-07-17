@@ -1,0 +1,39 @@
+---
+id: merge
+title: Merging sources
+sidebar_position: 2
+---
+
+# Merging sources
+
+The merge engine is the heart of Cairn. When several sources describe the same
+workout, Cairn produces one activity by choosing the best source **per field
+group** — not by picking a single "winner" source.
+
+## Field groups
+
+Fields are grouped (classification, time, duration, title, distance, elevation,
+speed, hr, power, …, `gps_track`, `laps`). For each group, a
+`PolicyResolver(ActivityType)` priority list decides which source wins. So a ride
+might take its GPS track from your bike computer, power from the trainer, and
+title from Strava — automatically.
+
+## Your edits are protected
+
+- **preserveUserEdits** — title, description, tags, privacy and gear are
+  user-owned; re-merging never clobbers them.
+- **Field-source override** — pin any field group to a specific source; applied
+  on every recompute.
+- **Classification override** — a per-activity overlay for type/discipline/flags
+  and summary metrics (distance/elevation/moving time), which survives re-import.
+
+## Streams stay per-source
+
+Streams are **never merged** — each source keeps its own. A primary stream is
+selected for rendering. You can even graft "source data from another activity"
+(a donor's selected groups + its stream, rebased in time) onto an activity.
+
+## Configure the policy
+
+Set your merge priorities in the web UI (the policy editor) per activity type.
+Manual entry is just a `manual` source fed through the same engine.

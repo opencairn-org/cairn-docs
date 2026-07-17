@@ -1,0 +1,52 @@
+---
+slug: /
+id: intro
+title: Cairn
+sidebar_label: Introduction
+sidebar_position: 1
+---
+
+# Cairn
+
+**Cairn is a self-hosted, multi-source activity tracker.** It imports your
+workouts from Strava, Garmin, file uploads (GPX/TCX/FIT) and manual entry,
+then merges every source of the same activity — field by field — under a
+policy you control. It stores streams in TimescaleDB, matches segments with
+PostGIS, computes best-efforts and training load (CTL/ATL/TSB), and ships a
+full social layer with optional ActivityPub federation (beta).
+
+One Go binary serves the API **and** the embedded web UI. Provider workers run
+as separate processes. The core is AGPL-3.0; the provider contract (protobuf + SDKs) and the
+provider workers are Apache-2.0, so you can build integrations without
+copyleft obligations.
+
+## Why Cairn
+
+- **You own the data.** Streams, raw blobs and exports live on your hardware.
+- **Multiple sources, one truth.** The merge engine reconciles the same workout
+  across providers without clobbering your edits.
+- **Open to agents.** Cairn is an OAuth 2.1 authorization server with an
+  [MCP server](/integrations/mcp) so AI agents and native/third-party apps can
+  connect securely, scoped per-user.
+- **Pluggable providers.** Workers are standalone repos that speak a proto +
+  NATS contract — write your own.
+
+## The repositories
+
+Cairn is a small family of repos:
+
+| Repo | What |
+| --- | --- |
+| `cairn-core` | The Go server (API + embedded web UI), domain, migrations |
+| `cairn-provider-strava` | The Strava worker (Go), standalone |
+| `cairn-provider-garmin` | The Garmin worker (Python), standalone |
+| `cairn-site` | The marketing/showcase site |
+| `cairn-docs` | These docs |
+
+## Where to next
+
+- [Getting started](/getting-started) — the 5-minute local run.
+- [Self-host](/self-host/overview) — Docker Compose, Kubernetes, configuration.
+- [Using Cairn](/using-cairn/import) — import, merge, segments, training load, social.
+- [Architecture](/architecture/overview) — how the pieces fit.
+- [OAuth & MCP](/integrations/oauth) — connect native apps and agents.

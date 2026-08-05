@@ -1,26 +1,35 @@
 # CI — build the Docusaurus site on every branch and PR so breakage
-# is caught early.
-# NOTE: deployment is currently DISABLED (if: false below) until the public
-# launch; once enabled it rsyncs to the static web host on push to main.
+# is caught early. Deployment runs ONLY when a v* tag is pushed. The deploy
+# job is imported from johnny/build and receives the built site as an
+# artifact - it never sees this repo's source.
 #
-# Deploy secrets (all host-specific values live in the CI secret store):
-#   DEPLOY_SSH_PASSWORD, DEPLOY_SSH_HOST, DEPLOY_SSH_USER, DEPLOY_PATH
+# Secrets needed (user-level JOHNNY_ALL_INKL_* plus per-repo):
+#   JOHNNY_ALL_INKL_SSH_HOST, JOHNNY_ALL_INKL_SSH_USER,
+#   JOHNNY_ALL_INKL_PRIVATE_KEY, JOHNNY_ALL_INKL_HOST_KEY,
+#   DEPLOY_REMOTE_PATH (rsync target path for this site)
 
 name: Build and deploy
 
 on:
   push:
     branches: ['**']
-    tags: ['v*']    
+    tags: ['v*']
   pull_request:
+  workflow_dispatch:
 
+# Cancel superseded branch/PR builds; never cancel a tag deploy
 concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+# Principle of least privilege
+permissions:
+  contents: read
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -38,26 +47,28 @@ jobs:
       - name: Build
         run: npm run build # canonical URL comes from docusaurus.config.js
 
-      - name: Install rsync + sshpass
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        run: |
-          if ! command -v rsync >/dev/null || ! command -v sshpass >/dev/null; then
-            apt-get update -qq
-            apt-get install -y rsync sshpass
-          fi
+      - name: Upload built site
+        # NOT actions/upload-artifact: the official v4 action detects Gitea
+        # as GHES and aborts. This fork is the same action with that check removed.
+        uses: https://github.com/christopherhx/gitea-upload-artifact@v4
+        with:
+          name: site
+          path: build/
+          retention-days: 1
+          if-no-files-found: error
 
-      - name: Upload to web host
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        env:
-          SSHPASS: ${{ secrets.DEPLOY_SSH_PASSWORD }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-        run: |
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          sshpass -e rsync -avz --delete \
-            --chmod=D755,F644 \
-            -e "ssh -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no" \
-            build/ \
-            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH"
+  deploy:
+    needs: build
+    # Deploy only on v* release tags — never from branches or PRs.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    uses: johnny/build/.gitea/workflows/deploy-static-page.yaml@v9
+    with:
+      artifact-name: site
+      # server-side stats dir - keep it out of the sync and safe from --delete
+      exclude: /logs/
+    secrets:
+      SSH_SERVER: ${{ secrets.JOHNNY_ALL_INKL_SSH_HOST }}
+      SSH_USER: ${{ secrets.JOHNNY_ALL_INKL_SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.JOHNNY_ALL_INKL_PRIVATE_KEY }}
+      SSH_HOST_KEY: ${{ secrets.JOHNNY_ALL_INKL_HOST_KEY }}
+      DEPLOY_REMOTE_PATH: ${{ secrets.DEPLOY_REMOTE_PATH }}

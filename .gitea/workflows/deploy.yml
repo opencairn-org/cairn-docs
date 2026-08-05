@@ -64,8 +64,6 @@ jobs:
     uses: johnny/build/.gitea/workflows/deploy-static-page.yaml@v9
     with:
       artifact-name: site
-      # server-side stats dir - keep it out of the sync and safe from --delete
-      exclude: /logs/
     secrets:
       SSH_SERVER: ${{ secrets.JOHNNY_ALL_INKL_SSH_HOST }}
       SSH_USER: ${{ secrets.JOHNNY_ALL_INKL_SSH_USER }}

@@ -1,0 +1,188 @@
+---
+id: configuration
+title: Configuration
+sidebar_position: 2
+---
+
+# Configuration
+
+All configuration is via environment variables prefixed with **`CAIRN_`**.
+Each subsystem has its own group (`CAIRN_<GROUP>_<KEY>`), read once at
+startup. This page lists every variable the server reads, with its default in
+the second column. A dash means the variable has no default and stays unset
+unless you provide it.
+
+Three variables are **required**: `CAIRN_DATABASE_URL`,
+`CAIRN_AUTH_SESSION_SECRET` and `CAIRN_AUTH_MASTER_ENCRYPTION_KEY`. The server
+refuses to start without them.
+
+:::tip
+`dev.env.example` in `cairn-core` is a working local set for the Compose dev
+stack. Copy it to `dev.env`; `make dev-server` sources it.
+:::
+
+## Database
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_DATABASE_URL` | — | **required** — `postgres://user:pass@host:5432/cairn` |
+| `CAIRN_DATABASE_AUTO_MIGRATE` | `false` | run the goose migrations on boot |
+| `CAIRN_DATABASE_MAX_CONNS` / `..._MIN_CONNS` | `10` / `2` | connection pool bounds |
+| `CAIRN_DATABASE_STATEMENT_TIMEOUT` | `30s` | per-statement timeout |
+| `CAIRN_DATABASE_LOCK_TIMEOUT` | `5s` | how long a statement waits for a lock |
+| `CAIRN_DATABASE_IDLE_IN_TX_TIMEOUT` | `60s` | ends sessions idle inside a transaction |
+| `CAIRN_DATABASE_APPLICATION_NAME` | `cairn` | shown in `pg_stat_activity` |
+
+## HTTP
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_HTTP_ADDR` | `0.0.0.0:8080` | listen address |
+| `CAIRN_HTTP_PUBLIC_BASE_URL` | `http://localhost:8080` | external URL — used for OAuth redirects, share links and federation |
+| `CAIRN_HTTP_CORS_ALLOWED_ORIGINS` | — | comma-separated origins for browser clients served from another origin |
+| `CAIRN_HTTP_TLS_CERT_FILE` / `..._TLS_KEY_FILE` | — | terminate TLS in-process instead of at a proxy |
+| `CAIRN_HTTP_READ_TIMEOUT` / `..._WRITE_TIMEOUT` / `..._IDLE_TIMEOUT` | `30s` / `5m` / `120s` | server timeouts; the write timeout is long because uploads and exports stream |
+| `CAIRN_HTTP_SHUTDOWN_TIMEOUT` | `30s` | grace period on SIGTERM |
+| `CAIRN_HTTP_RATE_LIMIT_PER_MIN` | `600` | requests per minute per session (per IP when anonymous); generous so the polling web UI is never throttled |
+
+## Auth
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_AUTH_SESSION_SECRET` | — | **required** — signs sessions and tokens; set a long random value |
+| `CAIRN_AUTH_MASTER_ENCRYPTION_KEY` | — | **required** — encrypts provider tokens and other secrets at rest; changing it makes stored credentials unreadable |
+| `CAIRN_AUTH_SESSION_TTL` | `720h` | absolute session lifetime (30 days) |
+| `CAIRN_AUTH_SESSION_IDLE_MAX` | `168h` | a session unused for this long expires (7 days) |
+| `CAIRN_AUTH_ARGON2_TIME` / `..._MEMORY` / `..._THREADS` / `..._KEY_LEN` | `2` / `19456` / `1` / `32` | Argon2id parameters for password hashing (memory in KiB) |
+| `CAIRN_AUTH_OAUTH_ENABLED` | `true` | Cairn's own OAuth 2.1 authorization server, used by native apps and [MCP](/integrations/mcp) |
+| `CAIRN_AUTH_OAUTH_ACCESS_TOKEN_TTL` | `1h` | |
+| `CAIRN_AUTH_OAUTH_REFRESH_TOKEN_TTL` | `2160h` | 90 days |
+| `CAIRN_AUTH_OAUTH_AUTH_CODE_TTL` | `5m` | |
+| `CAIRN_AUTH_OAUTH_ALLOW_DYNAMIC_REGISTRATION` | `true` | let clients register themselves (RFC 7591); see [OAuth](/integrations/oauth) |
+
+## Sign-in with an identity provider (OIDC)
+
+Besides passwords and passkeys, users can sign in through any OpenID Connect
+provider. List the provider ids, then configure each one under its own prefix.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_OIDC_PROVIDERS` | — | comma-separated ids, e.g. `pocketid,google` — each id becomes a login button |
+| `CAIRN_OIDC_<ID>_ISSUER_URL` | — | **required per provider** — the OIDC issuer |
+| `CAIRN_OIDC_<ID>_CLIENT_ID` / `..._CLIENT_SECRET` | — | **required per provider** — confidential client |
+| `CAIRN_OIDC_<ID>_NAME` | the id | label of the login button |
+| `CAIRN_OIDC_<ID>_SCOPES` | `openid,email,profile` | |
+| `CAIRN_OIDC_<ID>_AUDIENCE` | the client id | expected `aud` claim |
+| `CAIRN_OIDC_<ID>_SKIP_AUDIENCE_CHECK` | `false` | |
+| `CAIRN_OIDC_<ID>_USE_PKCE` | `true` | |
+| `CAIRN_OIDC_<ID>_AUTO_PROVISION` | `true` | create an account on first sign-in |
+| `CAIRN_OIDC_<ID>_AUTO_PROVISION_ROLE` | `user` | `user` or `admin` for auto-provisioned accounts |
+
+`<ID>` is the upper-cased provider id: `CAIRN_OIDC_PROVIDERS=google` reads
+`CAIRN_OIDC_GOOGLE_ISSUER_URL`.
+
+## Instance
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_INSTANCE_PUBLIC_URL` | `http://localhost:8080` | the instance's canonical URL as presented to other instances and in emails |
+| `CAIRN_INSTANCE_BOOTSTRAP_ADMIN_EMAIL` / `..._PASSWORD` | — | creates the first admin on first boot; harmless to leave set afterwards |
+| `CAIRN_INSTANCE_TRUSTED_PROXIES` | — | comma-separated CIDRs whose `X-Forwarded-*` headers are honored |
+
+## NATS (control plane)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | |
+| `CAIRN_NATS_CLUSTER_NAME` | — | optional guard against pointing at the wrong cluster |
+| `CAIRN_NATS_CLIENT_NAME` | `cairn-server` | connection name shown in NATS monitoring |
+| `CAIRN_NATS_CREDS_FILE` / `..._USERNAME` / `..._PASSWORD` | — | credentials (prod: nkey/JWT creds file) |
+| `CAIRN_NATS_TLS_CA_FILE` / `..._TLS_CERT_FILE` / `..._TLS_KEY_FILE` | — | TLS to the NATS server |
+| `CAIRN_NATS_CONNECT_TIMEOUT` / `..._RECONNECT_WAIT` / `..._MAX_RECONNECTS` | `10s` / `2s` / `-1` | `-1` reconnects forever |
+| `CAIRN_NATS_JOB_ACK_WAIT` | `5m` | a job not acknowledged in time is redelivered |
+| `CAIRN_NATS_JOB_MAX_DELIVER` | `5` | redeliveries before a job lands in the dead-letter stream |
+| `CAIRN_NATS_STREAM_RETENTION_DAYS` | `30` | JetStream retention for jobs and results |
+
+## Storage (S3-compatible, optional)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_STORAGE_ENDPOINT` | `http://minio:9000` | |
+| `CAIRN_STORAGE_REGION` | `us-east-1` | |
+| `CAIRN_STORAGE_BUCKET` | `cairn` | |
+| `CAIRN_STORAGE_ACCESS_KEY_ID` / `..._SECRET_ACCESS_KEY` | — | when both are empty, core runs without blob storage: no raw-file uploads, no photos, no cached map snapshots |
+| `CAIRN_STORAGE_USE_PATH_STYLE` | `true` | path-style addressing (MinIO, Garage); `false` for virtual-hosted buckets |
+| `CAIRN_STORAGE_PRESIGN_TTL` | `15m` | lifetime of presigned download links |
+| `CAIRN_STORAGE_TRANSFER_EXPIRY_DAYS` | `1` | how long export bundles stay downloadable |
+
+## Maps
+
+The interactive map in the web UI uses OpenFreeMap's key-less Liberty vector
+style by default. The server renders a static snapshot of every activity
+(`/api/activities/{id}/map.png`) for feeds and share links from raster tiles.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_MAP_TILE_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | raster tile template for the server-rendered snapshot |
+| `CAIRN_MAP_USER_AGENT` | — | identifies your instance to the tile provider; the public OSM tile server requires a meaningful value, see its usage policy |
+| `CAIRN_MAP_TIMEOUT` | `15s` | per-tile fetch timeout |
+| `VITE_MAP_STYLE_URL` | OpenFreeMap Liberty | **build-time** variable of the web UI, not read by the server: point it at your own MapLibre style JSON when you build the image yourself |
+
+## Geocoder
+
+Activities get a place name from reverse geocoding their start point.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_GEOCODER_ENABLED` | `true` | |
+| `CAIRN_GEOCODER_URL` | `https://nominatim.openstreetmap.org` | any Nominatim-compatible endpoint |
+| `CAIRN_GEOCODER_EMAIL` / `..._USER_AGENT` | — | contact details Nominatim asks for; set them before using the public instance |
+| `CAIRN_GEOCODER_MIN_INTERVAL` | `1s` | minimum spacing between requests (the public instance allows one per second) |
+| `CAIRN_GEOCODER_TIMEOUT` | `10s` | |
+| `CAIRN_GEOCODER_BATCH_SIZE` / `..._TICK_INTERVAL` | `50` / `2m` | how many activities are geocoded per tick |
+
+## Email
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_EMAIL_ADAPTER` | `none` | `none`, `smtp`, `ses`, `resend` or `mailgun`; `none` disables verification and reset mails |
+| `CAIRN_EMAIL_FROM_ADDRESS` / `..._FROM_NAME` | — / `Cairn` | |
+| `CAIRN_EMAIL_SMTP_HOST` / `..._SMTP_PORT` | — / `587` | |
+| `CAIRN_EMAIL_SMTP_USERNAME` / `..._SMTP_PASSWORD` | — | |
+| `CAIRN_EMAIL_SMTP_STARTTLS` | `true` | |
+| `CAIRN_EMAIL_SES_REGION` | — | for the `ses` adapter |
+| `CAIRN_EMAIL_API_KEY` | — | for `resend` and `mailgun` |
+| `CAIRN_EMAIL_MAILGUN_DOMAIN` | — | |
+
+## Scheduler
+
+The scheduler drives periodic provider reconciles and webhook drift checks.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_SCHEDULER_ENABLED` | `true` | disable on all but one replica if you scale core |
+| `CAIRN_SCHEDULER_TICK_INTERVAL` | `60s` | |
+| `CAIRN_SCHEDULER_POLLING_INTERVAL` | `60m` | how often each connected account is reconciled |
+| `CAIRN_SCHEDULER_WEBHOOK_DRIFT_INTERVAL` | `24h` | re-checks provider webhook subscriptions |
+| `CAIRN_SCHEDULER_BATCH_SIZE` | `100` | accounts per tick |
+
+## Federation
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_FEDERATION_ENABLED` | `false` | ActivityPub federation. Off keeps federation fully dormant: no remote activities in feeds and no "Federated" feed filter. See [Social & federation](/using-cairn/social) |
+| `CAIRN_FEDERATION_ALLOW_PRIVATE_HOSTS` | `false` | allow remote instances on private or loopback addresses — only for local testing |
+
+## Quotas and logging
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_QUOTA_MAX_ACTIVITIES_PER_USER` | `0` | `0` means unlimited |
+| `CAIRN_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
+| `CAIRN_LOG_FORMAT` | `json` | `json` or `text` |
+
+## Worker variables
+
+Provider workers are separate processes with their own, smaller set of
+`CAIRN_*` variables (NATS connection, enrollment, provider credentials). They
+are listed on the [Providers](/self-host/providers) page.

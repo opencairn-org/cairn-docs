@@ -12,8 +12,9 @@ sidebar_position: 1
 workouts from Strava, Garmin, file uploads (GPX/TCX/FIT) and manual entry,
 then merges every source of the same activity — field by field — under a
 policy you control. It stores streams in TimescaleDB, matches segments with
-PostGIS, computes best-efforts and training load (CTL/ATL/TSB), and ships a
-full social layer with optional ActivityPub federation (beta).
+PostGIS, computes best-efforts and training load (CTL/ATL/TSB), draws a
+heatmap of everything you have ever recorded, and ships a full social layer
+with optional ActivityPub federation (beta).
 
 One Go binary serves the API **and** the embedded web UI. Provider workers run
 as separate processes. The core is AGPL-3.0; the provider contract (protobuf + SDKs) and the
@@ -47,6 +48,6 @@ Cairn is a small family of repos:
 
 - [Getting started](/getting-started) — the 5-minute local run.
 - [Self-host](/self-host/overview) — Docker Compose, Kubernetes, configuration.
-- [Using Cairn](/using-cairn/import) — import, activities & filters, merge, segments, training load, social.
+- [Using Cairn](/using-cairn/import) — import, activities & heatmap, merge, segments, training load, social.
 - [Architecture](/architecture/overview) — how the pieces fit.
 - [OAuth & MCP](/integrations/oauth) — connect native apps and agents.

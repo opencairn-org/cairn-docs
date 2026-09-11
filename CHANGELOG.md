@@ -32,6 +32,24 @@ the year filter.
   credential fallback.
 - Self-host overview points at `CAIRN_INSTANCE_TRUSTED_PROXIES`.
 
+## [0.2.5] — 2026-09-11
+
+Documents Cairn core v0.2.5 and the provider workers strava v0.2.3 / garmin
+v0.2.1.
+
+### Added
+- Using Cairn: the page becomes **Activities, filters & heatmap** — the heatmap
+  view (`/heatmap`), its shared filter bar, the `GET /api/activities/heatmap`
+  request and its 5000-activity ceiling, and "Regenerate map snapshot" on the
+  Manage page.
+- Versioned docs snapshot `0.2.5`.
+
+### Changed
+- Social & federation: `CAIRN_FEDERATION_ENABLED=false` now keeps federation
+  fully dormant (no remote activities in feeds, no "Federated" filter,
+  `GET /api/instance/features` reports it disabled).
+- The intro mentions the heatmap.
+
 ## [0.2.4] — 2026-09-11
 
 Documents Cairn core v0.2.4 (2026-08-28).

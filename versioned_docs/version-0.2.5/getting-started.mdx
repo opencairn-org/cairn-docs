@@ -1,0 +1,63 @@
+---
+id: getting-started
+title: Getting started
+sidebar_position: 1
+---
+
+# Getting started
+
+The fastest way to see Cairn running locally.
+
+## Prerequisites
+
+- Docker + Docker Compose
+- (For development) Go 1.26 and Node 24+
+
+## Run the stack
+
+Cairn's infrastructure (Postgres + TimescaleDB + PostGIS, NATS, an S3-compatible
+store such as MinIO, and a mail catcher) runs in Docker; the core binary serves
+the API and the embedded web UI.
+
+```bash
+# in cairn-core
+cp dev.env.example dev.env   # once; tweak ports and secrets if needed
+make dev-up        # postgres + nats + minio + mailpit
+make dev-server    # core API on :8080 (rebuilds on save)
+make dev-web       # SvelteKit dev server (HMR) on :5173
+```
+
+`dev.env` holds every variable the dev stack needs, including the bootstrap
+admin (`CAIRN_INSTANCE_BOOTSTRAP_ADMIN_EMAIL` / `..._PASSWORD`). Open the web
+UI on `:5173` and sign in with that account.
+
+## Add a provider worker
+
+Provider workers live in their own repos and connect to the same NATS. Run the
+one(s) you need against the dev stack:
+
+```bash
+# Strava (Go) — in cairn-provider-strava
+export CAIRN_NATS_URL=nats://localhost:4222
+export CAIRN_WORKER_ENROLLMENT_TOKEN=...   # from POST /admin/worker-enrollments
+go run ./cmd/worker-strava
+
+# Garmin (Python) — in cairn-provider-garmin
+pip install -r requirements.txt
+export CAIRN_NATS_URL=nats://localhost:4222
+export CAIRN_GARMIN_EMAIL=you@example.com   # dev fallback; production delivers per-user credentials over NATS
+export CAIRN_GARMIN_PASSWORD=...
+export PYTHONPATH=.
+python -m cairn_garmin.main
+```
+
+:::tip
+A worker's only contract with core is the **proto messages + the NATS
+subjects** — there is no shared code dependency. See
+[Provider workers](/architecture/workers).
+:::
+
+## Next
+
+- [Self-host for real](/self-host/overview) (Compose / Kubernetes, config, TLS).
+- [Connect Strava or Garmin](/using-cairn/import).

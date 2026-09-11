@@ -1,13 +1,14 @@
 ---
 id: activities-and-heatmap
-title: Activities & filters
+title: Activities, filters & heatmap
 sidebar_position: 2
 ---
 
-# Activities & filters
+# Activities, filters & heatmap
 
-Every imported workout ends up on the **Activities** page, where a filter bar
-narrows the list to what you are looking for.
+Every imported workout ends up on the **Activities** page, and every GPS track
+on the **Heatmap**. Both views share the same filter bar, so a filter you build
+on one applies unchanged to the other.
 
 ## The filter bar
 
@@ -28,6 +29,17 @@ The bar narrows the list by:
 The list is paged; the filter and page live in the URL, so a filtered view can
 be bookmarked or shared with another user of the instance.
 
+## Heatmap
+
+The heatmap (`/heatmap`) draws every GPS track the current filter matches as a
+translucent line on one map. Routes you ride or run often accumulate and burn
+brightest; a one-off detour stays faint. Click a track to open its activity.
+
+The tracks come from the server's 30-second aggregates through a single request
+to `GET /api/activities/heatmap`, which accepts the same filter parameters as
+the activities feed. The response covers the newest 5000 matching activities
+and flags when it had to truncate; narrow the filter if you hit that ceiling.
+
 ## The activity page and its map
 
 Each activity has an interactive map and a static **map snapshot** that Cairn
@@ -46,6 +58,9 @@ actions:
   cadence, temperature and the title can each be excluded. The same choices are
   available on the API as
   `GET /api/activities/{id}/export?exclude=gps,heart_rate,...`.
+- **Regenerate map snapshot** re-renders the static `map.png`, for when the
+  track changed after the snapshot was cached or a render failed
+  (`POST /api/activities/{id}/map/regenerate`).
 - Merge policy and source handling, see [Merging sources](/using-cairn/merge).
 
 ## Related

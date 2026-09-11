@@ -1,0 +1,38 @@
+---
+id: pipeline
+title: The ingest pipeline
+sidebar_position: 2
+---
+
+# The ingest pipeline
+
+There is a **single ingest path** for every kind of source — worker push, file
+upload and manual create all funnel through it (`result_router.go`):
+
+```
+ingest (IngestActivityFromWorker)   identity dedup + persist source/stream (atomic)
+  → ReclusterBucket                 fuzzy-match + union-find group same-workout sources
+  → RecomputeActivityFromSources    domain.Merge over all non-detached sources
+  → follow-ups                      best-efforts, segments (+ranks), training load, PR notifs
+```
+
+## Durability rule
+
+The **ingest is durable**; **follow-ups never fail it**. Follow-ups run
+nil-tolerant and log on failure. This means a transient hiccup computing, say,
+training load can never lose your activity — it just gets recomputed later. Any
+new follow-up stage must hold to this pattern.
+
+## Async via NATS
+
+Workers and core communicate over JetStream subjects:
+
+- `cairn.jobs.<type>.<provider>` — work for a provider (fetch_source, backfill,
+  reconcile, parse_blob).
+- `cairn.results.<type>.<provider>` — `JobResult` events back to core.
+- `cairn.tokens.<provider>.*` / `cairn.creds.<provider>.*` — token + credential
+  exchange.
+- `cairn_worker_presence` (KV) — capability-manifest heartbeats.
+
+Core is the job producer + result consumer; a worker is the job consumer +
+result producer.

@@ -41,8 +41,11 @@ at their own style and the snapshot renderer at their own tiles, see
 The **Manage** page of an activity (owner only) collects the maintenance
 actions:
 
-- **Export** the activity as GPX, TCX or FIT
-  (`GET /api/activities/{id}/export`).
+- **Export** the activity as GPX, TCX or FIT. The export options let you strip
+  data before download: GPS, altitude, distance, speed, heart rate, power,
+  cadence, temperature and the title can each be excluded. The same choices are
+  available on the API as
+  `GET /api/activities/{id}/export?exclude=gps,heart_rate,...`.
 - Merge policy and source handling, see [Merging sources](/using-cairn/merge).
 
 ## Related

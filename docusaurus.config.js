@@ -42,7 +42,7 @@ const config = {
           // versioned_docs/ (npm run docusaurus docs:version X.Y.Z) and is
           // selectable from the navbar. docs/ is the unreleased "Next" tree
           // and is served under /next/.
-          lastVersion: '0.2.3',
+          lastVersion: '0.2.4',
           versions: {
             current: {label: 'Next', path: 'next', banner: 'unreleased'},
             '0.2.0': {label: '0.2.0 – 0.2.2'},

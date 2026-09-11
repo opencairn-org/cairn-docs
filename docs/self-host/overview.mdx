@@ -63,4 +63,6 @@ services:
 Put a TLS-terminating reverse proxy (Caddy, nginx, Traefik) in front of core,
 and set `CAIRN_INSTANCE_TRUSTED_PROXIES` to its address so client IPs are read
 from the forwarded headers. See [Configuration](/self-host/configuration) for
-the full variable list — in particular the three required secrets.
+the full variable list — in particular the three required secrets and the map
+tile settings if you would rather not hit the public OpenStreetMap tile server
+from your instance.

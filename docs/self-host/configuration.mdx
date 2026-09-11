@@ -119,11 +119,13 @@ provider. List the provider ids, then configure each one under its own prefix.
 
 The interactive map in the web UI uses OpenFreeMap's key-less Liberty vector
 style by default. The server renders a static snapshot of every activity
-(`/api/activities/{id}/map.png`) for feeds and share links from a fixed public
-basemap; the tile source becomes configurable with `CAIRN_MAP_*` in core 0.2.4.
+(`/api/activities/{id}/map.png`) for feeds and share links from raster tiles.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
+| `CAIRN_MAP_TILE_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | raster tile template for the server-rendered snapshot |
+| `CAIRN_MAP_USER_AGENT` | — | identifies your instance to the tile provider; the public OSM tile server requires a meaningful value, see its usage policy |
+| `CAIRN_MAP_TIMEOUT` | `15s` | per-tile fetch timeout |
 | `VITE_MAP_STYLE_URL` | OpenFreeMap Liberty | **build-time** variable of the web UI, not read by the server: point it at your own MapLibre style JSON when you build the image yourself |
 
 ## Geocoder

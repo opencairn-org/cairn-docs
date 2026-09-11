@@ -1,0 +1,38 @@
+---
+id: overview
+title: Architecture overview
+sidebar_position: 1
+---
+
+# Architecture overview
+
+Cairn's core follows a strict **hexagonal architecture**: domain → port →
+adapter. The dependency rule is the one rule that keeps the codebase clean.
+
+```
+ domain  ◀── port  ◀── usecase        adapters ──▶ port (implement)
+ (pure)      (interfaces)  (orchestration)   (postgres / nats / s3 / connect)
+```
+
+1. **`internal/domain`** imports nothing from port/usecase/adapter. It's pure:
+   types, invariants, the merge engine, segment matching, the visibility model.
+2. **`internal/port`** defines driven-port interfaces (it imports only domain).
+3. **`internal/usecase`** orchestrates domain + ports — never adapters.
+4. **Adapters** implement the ports: `internal/adapter/secondary/{postgres,
+   nats,s3,inmem}` and the primary `internal/adapter/primary/connect`.
+5. **`cmd/server/wire.go`** is the *only* place concrete adapters meet concrete
+   use-cases.
+
+## Surfaces
+
+- **Connect-RPC + REST** — both are live and user-facing.
+- **Web UI** — a SvelteKit CSR SPA embedded into the prod binary.
+- **NATS + JetStream** — the async control plane between core and the workers.
+
+## Stack
+
+Go 1.26 · Postgres 17 + TimescaleDB + PostGIS · pgx/v5 · goose migrations ·
+NATS/JetStream · SvelteKit + Connect-Web + MapLibre + uPlot.
+
+Read on: [the ingest pipeline](/architecture/pipeline) and
+[provider workers](/architecture/workers).

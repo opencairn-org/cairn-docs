@@ -41,6 +41,16 @@ docker run --rm \
 Only one Strava worker instance should own the webhook subject — set
 `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` on exactly one.
 
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | plus the same `CAIRN_NATS_*` credential and TLS variables core accepts |
+| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | one-time enrollment token from `POST /admin/worker-enrollments` |
+| `CAIRN_WORKER_NAME` | `strava-fetcher` | must match the enrollment's name pattern |
+| `CAIRN_WORKER_INSTANCE_ID` | generated | stable id when you run several instances |
+| `CAIRN_STRAVA_CLIENT_ID` / `..._CLIENT_SECRET` | — | only for an instance-wide Strava app; users normally bring their own |
+| `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` | — | set on exactly one instance |
+| `CAIRN_STRAVA_TOKEN_URL` | Strava's | override for testing against a mock |
+
 ## Garmin (Python)
 
 Repo: **cairn-provider-garmin**. Garmin has no public activity OAuth API, so the
@@ -50,8 +60,21 @@ delivered over NATS.
 ```bash
 docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
+  -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
   ghcr.io/johnnycube/cairn-provider-garmin:latest
 ```
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | dev stacks may use `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` instead of an enrollment |
+| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | enrollment token, as for Strava |
+| `CAIRN_WORKER_NAME` | `garmin-fetcher` | |
+| `CAIRN_WORKER_INSTANCE_ID` | generated | |
+| `CAIRN_HEARTBEAT_INTERVAL_S` | `30` | presence heartbeat to the `cairn_worker_presence` KV |
+| `CAIRN_PULL_BATCH` | `10` | jobs pulled per fetch |
+| `CAIRN_GARTH_HOME` | `~/.garth` | where Garmin SSO tokens are cached; mount a volume so MFA accounts are not re-prompted on every restart |
+| `CAIRN_GARMIN_EMAIL` / `..._PASSWORD` | — | **dev fallback only** — in production each user's credentials are delivered over NATS |
+| `CAIRN_PROTO_PATH` | `./proto` | location of the committed proto stubs |
 
 ## Writing your own provider
 

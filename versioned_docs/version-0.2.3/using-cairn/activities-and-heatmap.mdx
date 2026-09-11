@@ -1,0 +1,52 @@
+---
+id: activities-and-heatmap
+title: Activities & filters
+sidebar_position: 2
+---
+
+# Activities & filters
+
+Every imported workout ends up on the **Activities** page, where a filter bar
+narrows the list to what you are looking for.
+
+## The filter bar
+
+The bar narrows the list by:
+
+- **Type and discipline** — facets with counts, computed from your data.
+- **Year** — a facet listing every year with data; picking one is shorthand for
+  a date range covering that year.
+- **Date range** — explicit `from` / `to` dates, or the presets `7d`, `30d`,
+  `90d` and `1y`.
+- **Ranges** — distance, duration, elevation gain, average speed, heart rate
+  and power, each as a min/max pair in your preferred units.
+- **Flags** — virtual, e-bike, commute and race, each tri-state: any, only, or
+  none.
+- **Sort** — newest, oldest, longest distance, longest duration, most climbing,
+  fastest average.
+
+The list is paged; the filter and page live in the URL, so a filtered view can
+be bookmarked or shared with another user of the instance.
+
+## The activity page and its map
+
+Each activity has an interactive map and a static **map snapshot** that Cairn
+renders server-side for feeds, notifications and share links. The interactive
+map uses a key-less vector style by default; self-hosters can point the web UI
+at their own style and the snapshot renderer at their own tiles, see
+[Maps in Configuration](/self-host/configuration#maps).
+
+## Managing an activity
+
+The **Manage** page of an activity (owner only) collects the maintenance
+actions:
+
+- **Export** the activity as GPX, TCX or FIT
+  (`GET /api/activities/{id}/export`).
+- Merge policy and source handling, see [Merging sources](/using-cairn/merge).
+
+## Related
+
+- [Importing activities](/using-cairn/import) — where activities come from.
+- [Segments & best-efforts](/using-cairn/segments-and-efforts) — what is
+  computed on every import.

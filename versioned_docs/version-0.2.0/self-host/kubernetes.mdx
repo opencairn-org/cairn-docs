@@ -1,0 +1,36 @@
+---
+id: kubernetes
+title: Kubernetes
+sidebar_position: 4
+---
+
+# Kubernetes
+
+`cairn-core` ships Kubernetes manifests under `deploy/k8s/` (kustomize). They
+deploy core plus the worker Deployments, all referencing the published images.
+
+```
+deploy/k8s/
+  core.yaml            core Deployment + Service
+  worker-strava.yaml   Strava worker Deployment
+  worker-garmin.yaml   Garmin worker Deployment
+  kustomization.yaml   ties them together + image tags
+```
+
+Core, the Strava worker and the Garmin worker are all **stateless** — scale
+them with replicas (raise the worker count behind the same NATS to parallelize
+imports). State lives in Postgres, NATS JetStream and your object store.
+
+```bash
+kubectl apply -k deploy/k8s
+```
+
+Provide configuration via a `Secret`/`ConfigMap` mounted as the `CAIRN_*`
+environment (see [Configuration](/self-host/configuration)), and front core with
+an Ingress that terminates TLS.
+
+:::note
+The worker images are built and published from their own repositories
+(`cairn-provider-strava`, `cairn-provider-garmin`); the manifests just pin the
+image tags.
+:::

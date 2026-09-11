@@ -1,7 +1,7 @@
 ---
 id: social
 title: Social & federation
-sidebar_position: 5
+sidebar_position: 6
 ---
 
 # Social & federation
@@ -32,3 +32,6 @@ enabling it on an instance you care about.
 Enable `CAIRN_FEDERATION_ENABLED` to let your instance federate over
 ActivityPub — follow and be followed across Cairn (and other compatible)
 instances. It's off by default.
+
+For local testing between instances on private addresses, additionally set
+`CAIRN_FEDERATION_ALLOW_PRIVATE_HOSTS=true`; leave it off in production.

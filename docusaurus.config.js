@@ -38,6 +38,15 @@ const config = {
           sidebarPath: './sidebars.js',
           routeBasePath: '/', // docs are the site root
           editUrl: 'https://github.com/johnnycube/cairn-docs/tree/main/',
+          // Versioned docs: each Cairn release gets a frozen snapshot under
+          // versioned_docs/ (npm run docusaurus docs:version X.Y.Z) and is
+          // selectable from the navbar. docs/ is the unreleased "Next" tree
+          // and is served under /next/.
+          lastVersion: '0.2.3',
+          versions: {
+            current: {label: 'Next', path: 'next', banner: 'unreleased'},
+            '0.2.0': {label: '0.2.0 – 0.2.2'},
+          },
         },
         blog: false,
         theme: {
@@ -66,6 +75,7 @@ const config = {
           {to: '/self-host/overview', label: 'Self-host', position: 'left'},
           {to: '/architecture/overview', label: 'Architecture', position: 'left'},
           {to: '/integrations/oauth', label: 'OAuth & MCP', position: 'left'},
+          {type: 'docsVersionDropdown', position: 'right'},
           {
             href: 'https://github.com/johnnycube/cairn-core',
             label: 'Source',

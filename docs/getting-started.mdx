@@ -21,12 +21,15 @@ the API and the embedded web UI.
 
 ```bash
 # in cairn-core
+cp dev.env.example dev.env   # once; tweak ports and secrets if needed
 make dev-up        # postgres + nats + minio + mailpit
-make dev-server    # core API + web UI on :8090
-make dev-web       # SvelteKit dev server (HMR) on :5273
+make dev-server    # core API on :8080 (rebuilds on save)
+make dev-web       # SvelteKit dev server (HMR) on :5173
 ```
 
-Then open the web UI and sign in with the bootstrap admin from your `dev.env`.
+`dev.env` holds every variable the dev stack needs, including the bootstrap
+admin (`CAIRN_INSTANCE_BOOTSTRAP_ADMIN_EMAIL` / `..._PASSWORD`). Open the web
+UI on `:5173` and sign in with that account.
 
 ## Add a provider worker
 
@@ -40,7 +43,11 @@ export CAIRN_WORKER_ENROLLMENT_TOKEN=...   # from POST /admin/worker-enrollments
 go run ./cmd/worker-strava
 
 # Garmin (Python) — in cairn-provider-garmin
+pip install -r requirements.txt
 export CAIRN_NATS_URL=nats://localhost:4222
+export CAIRN_GARMIN_EMAIL=you@example.com   # dev fallback; production delivers per-user credentials over NATS
+export CAIRN_GARMIN_PASSWORD=...
+export PYTHONPATH=.
 python -m cairn_garmin.main
 ```
 

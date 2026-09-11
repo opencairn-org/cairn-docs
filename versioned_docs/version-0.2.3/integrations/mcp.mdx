@@ -1,0 +1,73 @@
+---
+id: mcp
+title: MCP server (agents)
+sidebar_position: 2
+---
+
+# MCP server
+
+Cairn exposes a **Model Context Protocol** server so AI agents can work with
+your activity data — scoped to your account, over OAuth, read-only by default.
+
+## Endpoint & auth
+
+- Endpoint: `https://<your-cairn>/mcp` (Streamable HTTP transport).
+- The MCP server is an **OAuth-protected resource**. It advertises
+  [protected-resource metadata](/integrations/oauth#discovery); the client then
+  runs Authorization Code + PKCE (with Dynamic Client Registration) against
+  Cairn's authorization server and calls `/mcp` with a bearer access token.
+- Every tool call is executed **as the authenticated user**, bounded by the
+  token's scopes.
+
+## Connecting an agent
+
+Point an MCP-capable client at the endpoint; OAuth is automatic:
+
+```jsonc
+// example MCP client config
+{
+  "mcpServers": {
+    "cairn": {
+      "url": "https://cairn.example/mcp"
+      // OAuth (PKCE + DCR) is handled by the client; approve read-only scopes
+    }
+  }
+}
+```
+
+## Tools (read-only)
+
+The current tool set is read-only — safe to hand to an assistant. Each tool is
+gated on the token's scope and runs as the token's user:
+
+| Tool | Scope | Description |
+| --- | --- | --- |
+| `list_activities` | `activities:read` | your most recent activities (newest first; `limit` arg) |
+| `get_activity` | `activities:read` | full detail for one activity (owner-only) |
+| `activity_stats` | `activities:read` | lifetime totals: count, distance, moving time, elevation |
+| `personal_records` | `activities:read` | your current personal records / best efforts |
+| `profile` | `profile:read` | your profile + unit/locale preferences |
+
+Writes (creating manual activities, edits, social actions) are intentionally not
+exposed; they can be added later behind `*:write` scopes and explicit consent.
+More read tools (streams, training-load curves, segments) are straightforward
+follow-ons.
+
+## Protocol
+
+Streamable HTTP, JSON-RPC 2.0. The server implements `initialize`,
+`tools/list`, `tools/call` and `ping`. A request without a valid bearer token
+gets `401` with:
+
+```
+WWW-Authenticate: Bearer resource_metadata="https://<your-cairn>/.well-known/oauth-protected-resource"
+```
+
+which is how the client discovers the authorization server and begins OAuth.
+
+## Security notes
+
+- Read-only tools + per-user scoping mean an agent can summarize and analyze but
+  not change or delete anything.
+- Revoke an agent any time from your authorized-apps settings — its tokens stop
+  working immediately.

@@ -46,7 +46,7 @@ services:
   core:
     image: ghcr.io/johnnycube/cairn-core:latest
     env_file: .env
-    ports: ["8090:8090"]
+    ports: ["8080:8080"]
     depends_on: [postgres, nats]
   worker-strava:
     image: ghcr.io/johnnycube/cairn-provider-strava:latest
@@ -60,5 +60,7 @@ services:
   minio: { image: minio/minio, command: ["server", "/data"] }
 ```
 
-Put a TLS-terminating reverse proxy (Caddy, nginx, Traefik) in front of core.
-See [Configuration](/self-host/configuration) for the full variable list.
+Put a TLS-terminating reverse proxy (Caddy, nginx, Traefik) in front of core,
+and set `CAIRN_INSTANCE_TRUSTED_PROXIES` to its address so client IPs are read
+from the forwarded headers. See [Configuration](/self-host/configuration) for
+the full variable list — in particular the three required secrets.

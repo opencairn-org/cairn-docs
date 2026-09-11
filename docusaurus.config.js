@@ -39,10 +39,10 @@ const config = {
           routeBasePath: '/', // docs are the site root
           editUrl: 'https://github.com/johnnycube/cairn-docs/tree/main/',
           // Versioned docs: each Cairn release gets a frozen snapshot under
-          // versioned_docs/ (npm run docusaurus docs:version X.Y.Z) and is
-          // selectable from the navbar. docs/ is the unreleased "Next" tree
-          // and is served under /next/.
-          lastVersion: '0.2.5',
+          // versioned_docs/ (npx docusaurus docs:version X.Y.Z) and is
+          // selectable from the navbar switch and /versions. The newest entry
+          // in versions.json is served at the site root; docs/ is the
+          // unreleased "Next" tree and is served under /next/.
           versions: {
             current: {label: 'Next', path: 'next', banner: 'unreleased'},
             '0.2.0': {label: '0.2.0 – 0.2.2'},
@@ -75,7 +75,16 @@ const config = {
           {to: '/self-host/overview', label: 'Self-host', position: 'left'},
           {to: '/architecture/overview', label: 'Architecture', position: 'left'},
           {to: '/integrations/oauth', label: 'OAuth & MCP', position: 'left'},
-          {type: 'docsVersionDropdown', position: 'right'},
+          {
+            type: 'docsVersionDropdown',
+            position: 'right',
+            className: 'navbar-version-switch',
+            dropdownActiveClassDisabled: true,
+            dropdownItemsAfter: [
+              {type: 'html', value: '<hr class="dropdown-separator">'},
+              {to: '/versions', label: 'All versions'},
+            ],
+          },
           {
             href: 'https://github.com/johnnycube/cairn-core',
             label: 'Source',
@@ -93,6 +102,7 @@ const config = {
               {label: 'Self-host', to: '/self-host/overview'},
               {label: 'Architecture', to: '/architecture/overview'},
               {label: 'OAuth & MCP', to: '/integrations/oauth'},
+              {label: 'All versions', to: '/versions'},
             ],
           },
           {

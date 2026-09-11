@@ -32,6 +32,12 @@ the year filter.
   credential fallback.
 - Self-host overview points at `CAIRN_INSTANCE_TRUSTED_PROXIES`.
 
+## [0.2.5.1] — 2026-09-11
+
+Site only, no content change: a version switch in the navbar (with an "All
+versions" entry), the `/versions` overview page, and clearer banners on older
+snapshots. The newest release is the default everywhere.
+
 ## [0.2.5] — 2026-09-11
 
 Documents Cairn core v0.2.5 and the provider workers strava v0.2.3 / garmin

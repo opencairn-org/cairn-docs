@@ -61,3 +61,24 @@
 [data-theme='dark'] .card {
   border: 1px solid #1f2c40;
 }
+
+/* Version switch in the navbar: a small monospace pill that names the
+   release you are reading; the dropdown lists every snapshot + /versions. */
+.navbar-version-switch {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--ifm-color-primary);
+  border-radius: 999px;
+  color: var(--ifm-color-primary);
+  line-height: 1.4;
+}
+.navbar-version-switch:hover,
+.dropdown--hoverable:hover > .navbar-version-switch {
+  background: var(--ifm-color-primary);
+  color: var(--ifm-background-color);
+}
+.navbar-version-switch::after {
+  border-color: currentColor transparent;
+}

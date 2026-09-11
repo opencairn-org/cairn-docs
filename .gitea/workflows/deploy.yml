@@ -3,10 +3,10 @@
 # job is imported from johnny/build and receives the built site as an
 # artifact - it never sees this repo's source.
 #
-# Secrets needed (user-level JOHNNY_ALL_INKL_* plus per-repo):
-#   JOHNNY_ALL_INKL_SSH_HOST, JOHNNY_ALL_INKL_SSH_USER,
-#   JOHNNY_ALL_INKL_PRIVATE_KEY, JOHNNY_ALL_INKL_HOST_KEY,
-#   DEPLOY_REMOTE_PATH (rsync target path for this site)
+# Secrets: the called workflow reads real stored secrets by these exact names
+# (Gitea does not deliver values mapped in the caller's `secrets:` block):
+#   SSH_SERVER, SSH_USER, SSH_PRIVATE_KEY, SSH_HOST_KEY (user-level) and
+#   DEPLOY_REMOTE_PATH (per repo: rsync target path for this site)
 
 name: Build and deploy
 
@@ -61,12 +61,12 @@ jobs:
     needs: build
     # Deploy only on v* release tags — never from branches or PRs.
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    uses: johnny/build/.gitea/workflows/deploy-static-page.yaml@v9
+    uses: johnny/build/.gitea/workflows/deploy-static-page.yaml@v11
     with:
       artifact-name: site
     secrets:
-      SSH_SERVER: ${{ secrets.JOHNNY_ALL_INKL_SSH_HOST }}
-      SSH_USER: ${{ secrets.JOHNNY_ALL_INKL_SSH_USER }}
-      SSH_PRIVATE_KEY: ${{ secrets.JOHNNY_ALL_INKL_PRIVATE_KEY }}
-      SSH_HOST_KEY: ${{ secrets.JOHNNY_ALL_INKL_HOST_KEY }}
+      SSH_SERVER: ${{ secrets.SSH_SERVER }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_HOST_KEY: ${{ secrets.SSH_HOST_KEY }}
       DEPLOY_REMOTE_PATH: ${{ secrets.DEPLOY_REMOTE_PATH }}

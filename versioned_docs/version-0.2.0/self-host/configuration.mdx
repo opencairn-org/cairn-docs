@@ -99,9 +99,8 @@ provider. List the provider ids, then configure each one under its own prefix.
 | `CAIRN_NATS_CREDS_FILE` / `..._USERNAME` / `..._PASSWORD` | — | credentials (prod: nkey/JWT creds file) |
 | `CAIRN_NATS_TLS_CA_FILE` / `..._TLS_CERT_FILE` / `..._TLS_KEY_FILE` | — | TLS to the NATS server |
 | `CAIRN_NATS_CONNECT_TIMEOUT` / `..._RECONNECT_WAIT` / `..._MAX_RECONNECTS` | `10s` / `2s` / `-1` | `-1` reconnects forever |
-| `CAIRN_NATS_JOB_ACK_WAIT` | `5m` | a job not acknowledged in time is redelivered |
+| `CAIRN_NATS_JOB_ACK_WAIT` | `5m` | ack window of the consumers core creates on `CAIRN_RESULTS`; also the TTL of the credentials auth-callout issues to workers. Job consumers are created by the workers with their own AckWait (Strava worker 2 min, Garmin worker 30 s), see the [provider contract](/architecture/provider-contract) |
 | `CAIRN_NATS_JOB_MAX_DELIVER` | `5` | redeliveries before a job lands in the dead-letter stream |
-| `CAIRN_NATS_STREAM_RETENTION_DAYS` | `30` | JetStream retention for jobs and results |
 
 ## Storage (S3-compatible, optional)
 

@@ -13,15 +13,15 @@ group** — not by picking a single "winner" source.
 ## Field groups
 
 Fields are grouped (classification, time, duration, title, distance, elevation,
-speed, hr, power, …, `gps_track`, `laps`). For each group, a
-`PolicyResolver(ActivityType)` priority list decides which source wins. So a ride
-might take its GPS track from your bike computer, power from the trainer, and
-title from Strava — automatically.
+speed, hr, power, …, `gps_track`, `laps`). For each group, a priority list
+that depends on the activity type decides which source wins. So a ride might
+take its GPS track from your bike computer, power from the trainer, and title
+from Strava — automatically.
 
 ## Your edits are protected
 
-- **preserveUserEdits** — title, description, tags, privacy and gear are
-  user-owned; re-merging never clobbers them.
+- **User edits are preserved** — title, description, tags, privacy and gear
+  are user-owned; re-merging never clobbers them.
 - **Field-source override** — pin any field group to a specific source; applied
   on every recompute.
 - **Classification override** — a per-activity overlay for type/discipline/flags

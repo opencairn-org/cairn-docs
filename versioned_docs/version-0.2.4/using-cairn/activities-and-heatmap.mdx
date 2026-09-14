@@ -45,7 +45,11 @@ actions:
   data before download: GPS, altitude, distance, speed, heart rate, power,
   cadence, temperature and the title can each be excluded. The same choices are
   available on the API as
-  `GET /api/activities/{id}/export?exclude=gps,heart_rate,...`.
+  `GET /api/activities/{id}/export.gpx?exclude=gps,heart_rate,...` (likewise
+  `export.tcx` and `export.fit`). Valid keys: `gps`, `altitude`, `distance`,
+  `speed`, `heart_rate`, `power`, `cadence`, `temperature`, `title`; an unknown
+  key is a `400`. `GET /api/activities/{id}/export/options` returns which of
+  them the activity has (`available`).
 - Merge policy and source handling, see [Merging sources](/using-cairn/merge).
 
 ## Related

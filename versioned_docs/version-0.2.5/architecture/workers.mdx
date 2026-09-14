@@ -45,8 +45,8 @@ reconcile semantics — is the
 with cairn-core's `worker-conformance` harness.
 
 :::info Standalone by design
-Earlier, the Strava worker shared Go packages with core via `internal/`. It was
-extracted to be fully standalone (its own `go.mod`, a copied worker SDK + a
-slim worker-side NATS client), proving the real contract is the wire format,
-not shared code — exactly like the Python worker.
+Each worker is a standalone repository with its own build and release cycle.
+The Go worker carries its own worker SDK and NATS client, the Python worker
+implements the loop directly; neither imports core. The contract is the wire
+format, not shared code.
 :::

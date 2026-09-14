@@ -6,28 +6,93 @@ sidebar_position: 4
 
 # Kubernetes
 
-`cairn-core` ships Kubernetes manifests under `deploy/k8s/` (kustomize). They
-deploy core plus the worker Deployments, all referencing the published images.
+`cairn-core` ships a self-contained kustomize bundle under
+[`deploy/k8s/`](https://github.com/johnnycube/cairn-core/tree/main/deploy/k8s):
+core, both workers and single-instance backing services. Its `README.md` is
+the authoritative deploy guide; this page summarises it.
 
 ```
 deploy/k8s/
-  core.yaml            core Deployment + Service
-  worker-strava.yaml   Strava worker Deployment
-  worker-garmin.yaml   Garmin worker Deployment
-  kustomization.yaml   ties them together + image tags
+  README.md             deploy steps, scaling, hardening
+  namespace.yaml        cairn namespace
+  config.yaml           non-secret config (ConfigMap cairn-config)
+  secrets.example.yaml  copy to secrets.yaml and fill in; do not commit
+  postgres.yaml         TimescaleDB StatefulSet + headless Service + 20Gi PVC
+  nats.yaml             NATS + JetStream StatefulSet (max_payload 8MB) + 5Gi PVC
+  minio.yaml            MinIO StatefulSet + 20Gi PVC (the server creates the bucket)
+  migrate-job.yaml      one-shot `cairn migrate up`
+  core.yaml             cairn-core Deployment + Service (:80 -> :8080)
+  worker-strava.yaml    Strava worker Deployment
+  worker-garmin.yaml    Garmin worker Deployment (emptyDir token cache)
+  ingress.yaml          TLS entry point (nginx + cert-manager example)
+  kustomization.yaml    ties them together + image tags
 ```
 
-Core, the Strava worker and the Garmin worker are all **stateless** — scale
-them with replicas (raise the worker count behind the same NATS to parallelize
-imports). State lives in Postgres, NATS JetStream and your object store.
+## Deploy
 
-```bash
-kubectl apply -k deploy/k8s
-```
+1. Copy `secrets.example.yaml` to `secrets.yaml` and fill it in. Generate
+   `CAIRN_AUTH_SESSION_SECRET` and `CAIRN_AUTH_MASTER_ENCRYPTION_KEY` with
+   `openssl rand -base64 32`. The DB password must be identical in
+   `CAIRN_DATABASE_URL` and `POSTGRES_PASSWORD`, the storage credentials
+   identical to `MINIO_ROOT_*`.
+2. Set `CAIRN_HTTP_PUBLIC_BASE_URL` in `config.yaml` and the host in
+   `ingress.yaml` to your domain. They must match: OIDC redirects, webhook
+   callbacks and share/reset links derive from it.
+3. Apply the secrets first (they are not part of the kustomization), then the
+   bundle:
 
-Provide configuration via a `Secret`/`ConfigMap` mounted as the `CAIRN_*`
-environment (see [Configuration](/self-host/configuration)), and front core with
-an Ingress that terminates TLS.
+   ```bash
+   kubectl apply -f secrets.yaml
+   kubectl apply -k .
+   ```
+
+   The `cairn-migrate` Job runs `migrate up` before core serves traffic; core
+   refuses to start against an older schema. Re-running it is a no-op; after
+   a version bump, delete and re-apply the Job.
+4. Verify with `kubectl -n cairn get pods`,
+   `kubectl -n cairn logs job/cairn-migrate` and
+   `kubectl -n cairn rollout status deploy/cairn-core`, then log in at the
+   Ingress host as the bootstrap admin
+   (`CAIRN_INSTANCE_BOOTSTRAP_ADMIN_EMAIL` / `..._PASSWORD`).
+
+Configuration is the `CAIRN_*` environment (see
+[Configuration](/self-host/configuration)), split between the ConfigMap and
+the Secret.
+
+## State and scaling
+
+- Workers reach core only through NATS (`nats:4222`): job/result bus and blob
+  presign request/reply. They need no DB or S3 credentials.
+- Core and the Strava worker are stateless; raise `replicas` freely, JetStream
+  pull consumers share the work. Exception: the Strava webhook owner is
+  single-instance. Keep the Deployment that sets
+  `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` at `replicas: 1`; to scale Strava, run
+  the pull workers without the token and one webhook-owner replica beside
+  them.
+- The Garmin worker keeps a Garth token store under `CAIRN_GARTH_HOME`. The
+  bundle mounts it as an `emptyDir`, so a restarted pod logs in again from the
+  credentials delivered over NATS. Mount a persistent volume there if MFA
+  accounts should not be re-prompted on every restart (see
+  [Providers](/self-host/providers)). Replicas do not share it.
+- Postgres, NATS and MinIO are single-instance in the bundle. For HA, swap in
+  a Postgres operator (e.g. CloudNativePG), a NATS cluster and distributed
+  MinIO or a managed S3 bucket, and point the same env at them.
+
+## Hardening
+
+- The bundle runs NATS unauthenticated on the cluster network. For untrusted
+  networks enable enrollment-token auth-callout: bootstrap the account key
+  (`POST /api/admin/nats/bootstrap-account-key`), put the returned public key
+  in `nats.conf`, and set `CAIRN_WORKER_ENROLLMENT_TOKEN` on the Strava worker
+  (see [Providers](/self-host/providers#enrollment)).
+- `secrets.example.yaml` uses plain `stringData`; use SealedSecrets, External
+  Secrets or SOPS for real clusters. Back up
+  `CAIRN_AUTH_MASTER_ENCRYPTION_KEY` separately from the database, it
+  encrypts every credential at rest.
+- Terminate TLS at the Ingress and add a strict Content-Security-Policy there;
+  it is not baked into the server.
+- Backups: Postgres is the source of truth (including the encrypted NATS
+  account key); MinIO holds re-fetchable raw blobs; JetStream is transient.
 
 :::note
 The worker images are built and published from their own repositories

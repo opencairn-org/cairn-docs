@@ -13,16 +13,29 @@ need.
 
 ## Enrollment
 
-In production a worker authenticates to NATS with a one-time **enrollment
-token** (NATS auth-callout mints scoped credentials). Create one as an admin:
+In production the Strava worker authenticates to NATS with a one-time
+**enrollment token** (NATS auth-callout mints scoped credentials). Create one
+as an admin. The request is authenticated like any other API call: an admin's
+session cookie or personal access token.
 
 ```bash
-curl -X POST https://cairn.example/admin/worker-enrollments \
-  -H "Authorization: Bearer <admin token>" \
-  -d '{ "worker_name_pattern": "strava-*" }'
+curl -X POST https://cairn.example/api/admin/worker-enrollments \
+  -H "Authorization: Bearer cairn_pat_..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "strava-fetcher", "expires_in_hours": 720, "note": "prod Strava"}'
 ```
 
-Pass the returned token to the worker as `CAIRN_WORKER_ENROLLMENT_TOKEN`.
+- `name` (required): the worker name — lowercase letters, digits and hyphens,
+  no leading or trailing hyphen. The worker's `CAIRN_WORKER_NAME` must equal
+  it.
+- `expires_in_hours` (optional): defaults to `8760` (365 days), which is also
+  the cap.
+- `note` (optional): free text shown in the admin list.
+
+The `201` response carries the enrollment record and the plaintext `token`,
+shown once. Pass it to the worker as `CAIRN_WORKER_ENROLLMENT_TOKEN`.
+`GET /api/admin/worker-enrollments` lists enrollments,
+`POST /api/admin/worker-enrollments/{id}/revoke` revokes one.
 
 ## Strava (Go)
 
@@ -43,11 +56,10 @@ Only one Strava worker instance should own the webhook subject — set
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `CAIRN_NATS_URL` | `nats://localhost:4222` | plus the same `CAIRN_NATS_*` credential and TLS variables core accepts |
-| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | one-time enrollment token from `POST /admin/worker-enrollments` |
-| `CAIRN_WORKER_NAME` | `strava-fetcher` | must match the enrollment's name pattern |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` for authenticated servers |
+| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | one-time enrollment token from `POST /api/admin/worker-enrollments` |
+| `CAIRN_WORKER_NAME` | `strava-fetcher` | must equal the enrollment's `name` |
 | `CAIRN_WORKER_INSTANCE_ID` | generated | stable id when you run several instances |
-| `CAIRN_STRAVA_CLIENT_ID` / `..._CLIENT_SECRET` | — | only for an instance-wide Strava app; users normally bring their own |
 | `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` | — | set on exactly one instance |
 | `CAIRN_STRAVA_TOKEN_URL` | Strava's | override for testing against a mock |
 
@@ -55,26 +67,25 @@ Only one Strava worker instance should own the webhook subject — set
 
 Repo: **cairn-provider-garmin**. Garmin has no public activity OAuth API, so the
 worker uses the `garminconnect` library (Garth SSO). Per-user credentials are
-delivered over NATS.
+delivered over NATS. The worker does not use an enrollment token; it connects
+with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` when set, otherwise anonymously.
 
 ```bash
 docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
-  -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
   ghcr.io/johnnycube/cairn-provider-garmin:latest
 ```
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `CAIRN_NATS_URL` | `nats://localhost:4222` | dev stacks may use `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` instead of an enrollment |
-| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | enrollment token, as for Strava |
-| `CAIRN_WORKER_NAME` | `garmin-fetcher` | |
-| `CAIRN_WORKER_INSTANCE_ID` | generated | |
-| `CAIRN_HEARTBEAT_INTERVAL_S` | `30` | presence heartbeat to the `cairn_worker_presence` KV |
-| `CAIRN_PULL_BATCH` | `10` | jobs pulled per fetch |
-| `CAIRN_GARTH_HOME` | `~/.garth` | where Garmin SSO tokens are cached; mount a volume so MFA accounts are not re-prompted on every restart |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` are used when set |
+| `CAIRN_WORKER_NAME` | `garmin-fetcher` | shared by every instance of the worker |
+| `CAIRN_WORKER_INSTANCE_ID` | generated | unique per instance; in Kubernetes set it to the pod name so a restart reuses its presence key |
+| `CAIRN_HEARTBEAT_INTERVAL_S` | `20` | presence heartbeat to the `cairn_worker_presence` KV |
+| `CAIRN_PULL_BATCH` | `4` | jobs pulled per fetch |
+| `CAIRN_GARTH_HOME` | `/tmp/cairn-garth` | Garth token store, keeps the Garmin session between jobs; mount a volume so MFA accounts are not re-prompted on every restart |
 | `CAIRN_GARMIN_EMAIL` / `..._PASSWORD` | — | **dev fallback only** — in production each user's credentials are delivered over NATS |
-| `CAIRN_PROTO_PATH` | `./proto` | location of the committed proto stubs |
+| `CAIRN_PROTO_PATH` | `<repo>/proto` | location of the committed proto stubs |
 
 ## Writing your own provider
 

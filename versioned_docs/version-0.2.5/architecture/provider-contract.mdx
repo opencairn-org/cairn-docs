@@ -64,9 +64,8 @@ of your provider that core publishes:
 
 :::warning Why "every subject" is a MUST
 `CAIRN_JOBS` is a work-queue stream — messages for a subject nobody consumes
-are retained forever. Live incident: the garmin worker shipped without a
-reconcile consumer; the scheduler's per-minute reconcile publishes
-accumulated 2,779 messages in two days and new activities were never
+are retained forever. A worker without a reconcile consumer leaves the
+scheduler's reconcile jobs queued indefinitely and new activities are never
 auto-imported.
 :::
 
@@ -78,9 +77,12 @@ auto-imported.
 - Poison (bad payload, activity gone, unmappable data) → publish a **failure
   envelope** ([§6](#6-failure-envelope--must)) then **Term**.
 - Long-running handling MUST extend the ack deadline (`in_progress`) on a
-  cadence below the consumer AckWait (2 min): heartbeat every fetched message
-  from batch arrival until its disposition. Live incident: without this,
-  redelivery mid-processing re-imported one activity every 6 minutes for 20h.
+  cadence below the AckWait of the job consumer the worker creates (2 min in
+  the Strava worker, 30 s in the Garmin worker; core's
+  `CAIRN_NATS_JOB_ACK_WAIT` does not apply to worker-created consumers):
+  heartbeat every fetched message from batch arrival until its disposition,
+  otherwise JetStream redelivers mid-processing and the activity is
+  re-imported on every redelivery.
 - Bound retries: Term (with failure envelope) after ~5 deliveries of a
   persistently failing job rather than NAK-looping forever.
 
@@ -138,9 +140,8 @@ results `result:<job_id>`, fetch_source sub-jobs enqueued by reconcile
 `reconcile:<provider>:<account_id>:<ext_id>`.
 
 **Stream hygiene — SHOULD:** emit strictly unique, ordered sample
-timestamps. Core dedupes defensively (last sample wins), but two live
-incidents (garmin + strava, duplicated provider rows around pauses) show
-providers do ship duplicates — clean them at the source.
+timestamps. Core dedupes defensively (last sample wins), but providers do
+ship duplicate samples around pauses — clean them at the source.
 
 ## 6. Failure envelope — MUST
 

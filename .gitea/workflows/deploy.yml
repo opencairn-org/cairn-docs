@@ -65,8 +65,8 @@ jobs:
     with:
       artifact-name: site
     secrets:
-      SSH_SERVER: ${{ secrets.SSH_SERVER }}
-      SSH_USER: ${{ secrets.SSH_USER }}
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-      SSH_HOST_KEY: ${{ secrets.SSH_HOST_KEY }}
+      SSH_SERVER: ${{ secrets.DEPLOY_SSH_HOST }}
+      SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      SSH_HOST_KEY: ${{ secrets.DEPLOY_SSH_HOST_KEY }}
       DEPLOY_REMOTE_PATH: ${{ secrets.DEPLOY_REMOTE_PATH }}

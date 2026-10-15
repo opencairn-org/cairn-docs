@@ -71,9 +71,18 @@ const config = {
           src: 'img/logo.svg',
         },
         items: [
-          {type: 'docSidebar', sidebarId: 'docs', position: 'left', label: 'Docs'},
+          {
+            type: 'docSidebar',
+            sidebarId: 'docs',
+            position: 'left',
+            label: 'Docs',
+          },
           {to: '/self-host/overview', label: 'Self-host', position: 'left'},
-          {to: '/architecture/overview', label: 'Architecture', position: 'left'},
+          {
+            to: '/architecture/overview',
+            label: 'Architecture',
+            position: 'left',
+          },
           {to: '/integrations/oauth', label: 'OAuth & MCP', position: 'left'},
           {
             type: 'docsVersionDropdown',
@@ -108,9 +117,18 @@ const config = {
           {
             title: 'Project',
             items: [
-              {label: 'cairn-core', href: 'https://github.com/johnnycube/cairn-core'},
-              {label: 'cairn-provider-strava', href: 'https://github.com/johnnycube/cairn-provider-strava'},
-              {label: 'cairn-provider-garmin', href: 'https://github.com/johnnycube/cairn-provider-garmin'},
+              {
+                label: 'cairn-core',
+                href: 'https://github.com/johnnycube/cairn-core',
+              },
+              {
+                label: 'cairn-provider-strava',
+                href: 'https://github.com/johnnycube/cairn-provider-strava',
+              },
+              {
+                label: 'cairn-provider-garmin',
+                href: 'https://github.com/johnnycube/cairn-provider-garmin',
+              },
             ],
           },
           {

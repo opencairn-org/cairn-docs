@@ -1,0 +1,8 @@
+# gitleaks: default rules plus an allowlist for documentation placeholders
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Placeholder tokens in docs examples (cairn_pat_...)"
+regexTarget = "match"
+regexes = ['''cairn_pat_\.\.\.''']

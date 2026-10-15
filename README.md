@@ -7,7 +7,7 @@ self-hosted, multi-source activity tracker. Published at
 
 ## Prerequisites
 
-Node.js ≥ 20.
+Node.js at the version in `.nvmrc` (`nvm use`).
 
 ## Install
 
@@ -32,11 +32,21 @@ npm run build
 Generates the static site into `build/`. Preview the production build with
 `npm run serve`.
 
+## Check
+
+```bash
+npm run check
+```
+
+Lint, site build, dependency and secret audit, and fleetlint; CI runs the
+same. See [CONTRIBUTING.md](CONTRIBUTING.md) for the tools and git hooks and
+[ARCHITECTURE.md](ARCHITECTURE.md) for how the site is put together.
+
 ## Deployment
 
-Deployment is automated: CI builds `build/` and rsyncs it to the static web
-host on pushes to `main` (see `.gitea/workflows/deploy.yml`). There is no manual
-`gh-pages` step. The canonical URL is set in `docusaurus.config.js`.
+Deployment is automated: CI builds `build/` on every push and rsyncs it to the
+static web host when a `v*` tag is pushed (see `.gitea/workflows/deploy.yml`).
+There is no manual `gh-pages` step. The canonical URL is set in `docusaurus.config.js`.
 
 ## License
 

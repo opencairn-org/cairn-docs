@@ -35,7 +35,12 @@ curl -X POST https://cairn.example/api/admin/worker-enrollments \
 The `201` response carries the enrollment record and the plaintext `token`,
 shown once. Pass it to the worker as `CAIRN_WORKER_ENROLLMENT_TOKEN`.
 `GET /api/admin/worker-enrollments` lists enrollments,
-`POST /api/admin/worker-enrollments/{id}/revoke` revokes one.
+`POST /api/admin/worker-enrollments/{id}/revoke` revokes one and
+`POST /api/admin/worker-enrollments/{id}/prolong` moves its expiry, even after
+it has lapsed. Both take an optional JSON body: `{"reason": "..."}` for revoke,
+`{"expires_in_hours": 720}` for prolong, with the same default and cap of
+`8760`. The body can be left out; one that is not valid JSON is answered with
+`400`.
 
 ## Strava (Go)
 

@@ -5,8 +5,8 @@ Docusaurus. It runs no server code of its own.
 
 ## Reporting a vulnerability
 
-Do not open a public issue. Email `contact@opencairn.org` with "security" in
-the subject. Reports are acknowledged within 7 days.
+Do not open a public issue. Email `security@johanneskueber.com` with "security"
+in the subject. Reports are acknowledged within 7 days.
 
 Vulnerabilities in Cairn itself belong to
 [cairn-core](https://github.com/johnnycube/cairn-core) or the provider

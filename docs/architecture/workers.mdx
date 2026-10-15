@@ -23,9 +23,13 @@ dependency.
 
 - **Registers** via the enrollment-token flow (NATS auth-callout mints scoped
   nkey credentials).
-- **Consumes** `cairn.jobs.*.<provider>` jobs.
-- **Fetches** from the provider's API (using per-user tokens delivered over
-  NATS).
+- **Consumes** its provider's jobs through durable pull consumers on the exact
+  `cairn.jobs.<job_type>.<provider>` subjects (`fetch_source`, `reconcile`,
+  `parse_blob`, `import_metrics`, `backfill`) and serves
+  `cairn.discover.<provider>`.
+- **Fetches** from the provider's API (using per-user tokens or credentials
+  delivered over NATS: `cairn.tokens.<provider>.*`,
+  `cairn.creds.<provider>.get`).
 - **Publishes** `cairn.worker.v1.JobResult` with `WorkerEvent`s (imported
   activities, laps, segment efforts, records, metrics).
 - **Heartbeats** its capability manifest (which data types it can read/backfill).

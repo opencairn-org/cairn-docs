@@ -4,6 +4,40 @@ All notable changes to the Cairn documentation site are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/). Dates are
 ISO-8601. The site version tracks the Cairn release it documents.
 
+## [0.3.0] — 2026-10-15
+
+Documents Cairn core v0.3.0 and the provider workers strava v0.3.0 / garmin
+v0.3.0.
+
+### Added
+- Self-host → Configuration: `cairn config help`, the request limits (4 MiB
+  per Connect message, upload and attachment body caps, 1 MiB JSON and
+  webhook bodies) and the outbound address guard with the ranges it refuses.
+- Self-host → Providers: the NATS permission template auth-callout grants to
+  enrolled workers, and the Garmin image's non-root user (uid/gid 10001) with
+  the `/data` ownership note for mounted volumes.
+- Self-host → Overview: upgrading from 0.2.x.
+- Architecture → Pipeline: the full subject list and how core and the Strava
+  worker pick JetStream or core NATS publish per subject.
+- Versioned docs snapshot `0.3.0`.
+
+### Changed
+- Self-host → Configuration: only `CAIRN_`-prefixed variables are read, and an
+  empty required variable fails startup; `CAIRN_NATS_URL=` disables NATS.
+- Self-host: the Compose sketch, `docker run` examples and the Kubernetes
+  image pins reference core, Strava and Garmin v0.3.0 instead of `latest`; the
+  bundle's own pins lag behind and are overridden in `kustomization.yaml`.
+- Architecture → Provider contract: job consumers filter on the exact
+  `cairn.jobs.<job_type>.<provider>` subject, workers stay within the
+  permission template, and publishes are routed per subject.
+- Getting started: Go 1.27, and the Garmin worker runs with uv.
+
+### Fixed
+- `CAIRN_STORAGE_PRESIGN_TTL` and `CAIRN_STORAGE_TRANSFER_EXPIRY_DAYS`
+  describe what the server uses them for, and the Garmin worker defaults for
+  `CAIRN_WORKER_INSTANCE_ID`, `CAIRN_GARTH_HOME` and `CAIRN_PROTO_PATH` match
+  its configuration, as does the Strava worker's instance id.
+
 ## [0.2.6] — 2026-10-15
 
 Documents Cairn core v0.2.6 and the provider workers strava v0.2.4 / garmin

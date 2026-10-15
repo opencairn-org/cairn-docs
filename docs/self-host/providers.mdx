@@ -14,33 +14,99 @@ need.
 ## Enrollment
 
 In production the Strava worker authenticates to NATS with a one-time
-**enrollment token** (NATS auth-callout mints scoped credentials). Create one
-as an admin. The request is authenticated like any other API call: an admin's
+**enrollment token** (NATS auth-callout mints scoped credentials; set it up
+as described in [NATS auth-callout](#nats-auth-callout)). Create an
+enrollment as an admin, in the admin UI (**Worker onboarding**) or over the
+API. The request is authenticated like any other API call: an admin's
 session cookie or personal access token.
 
 ```bash
 curl -X POST https://cairn.example/api/admin/worker-enrollments \
   -H "Authorization: Bearer cairn_pat_..." \
   -H "Content-Type: application/json" \
-  -d '{"name": "strava-fetcher", "expires_in_hours": 720, "note": "prod Strava"}'
+  -d '{"name": "strava-fetcher", "provider": "strava", "expires_in_hours": 720, "note": "prod Strava"}'
 ```
 
 - `name` (required): the worker name — lowercase letters, digits and hyphens,
   no leading or trailing hyphen. The worker's `CAIRN_WORKER_NAME` must equal
   it.
+- `provider` (required): the provider the worker serves, `strava` or
+  `garmin`. It scopes the worker's NATS permissions. A missing or unknown
+  provider is answered with `400` (`provider is required (one of: garmin,
+  strava)`).
 - `expires_in_hours` (optional): defaults to `8760` (365 days), which is also
   the cap.
 - `note` (optional): free text shown in the admin list.
 
 The `201` response carries the enrollment record and the plaintext `token`,
 shown once. Pass it to the worker as `CAIRN_WORKER_ENROLLMENT_TOKEN`.
-`GET /api/admin/worker-enrollments` lists enrollments,
+`GET /api/admin/worker-enrollments` lists enrollments and the accepted
+`providers`,
 `POST /api/admin/worker-enrollments/{id}/revoke` revokes one and
 `POST /api/admin/worker-enrollments/{id}/prolong` moves its expiry, even after
 it has lapsed. Both take an optional JSON body: `{"reason": "..."}` for revoke,
 `{"expires_in_hours": 720}` for prolong, with the same default and cap of
 `8760`. The body can be left out; one that is not valid JSON is answered with
 `400`.
+
+### Re-enroll required
+
+Before core v0.3.1 an enrollment carried no provider. Core refuses those at
+connect (reason `enrollment_missing_provider`) and cannot fill the provider in
+afterwards. The enrollment list marks them with `"reenroll_required": true`
+and the admin UI with a **re-enroll required** badge: create a new enrollment
+with a provider, give the worker its token, and revoke the old one.
+
+### NATS auth-callout
+
+Core answers NATS auth-callout requests when `CAIRN_NATS_AUTH_CALLOUT=true`.
+Core and the admitted workers share one NATS account, named by
+`CAIRN_NATS_WORKER_ACCOUNT`; core connects as a user that bypasses the
+callout. Worker enrollment under NATS auth requires core v0.3.1 or later.
+
+1. Bootstrap the account signing key once:
+   `POST /api/admin/nats/bootstrap-account-key` returns its `public_key`.
+2. Run nats-server with this config (it is `docker/nats-auth-callout.conf` in
+   cairn-core). `$CAIRN_NATS_AUTH_ISSUER` (the public key) and
+   `$CAIRN_NATS_PASSWORD` are read from nats-server's environment.
+
+   ```hcl
+   http_port: 8222
+   jetstream { store_dir: "/data" }
+   max_payload: 8MB
+
+   accounts {
+     CAIRN {
+       jetstream: enabled
+       users: [
+         # core itself; listed in auth_users, so it bypasses the callout
+         { user: cairn-core, password: $CAIRN_NATS_PASSWORD }
+         # seedless placeholder: makes nats-server send the connect nonce the
+         # Strava worker needs; generate your own with `nk -gen user -pubout`
+         { nkey: UBZQLXX3CXHIQZ2VZ4WSKLWB3DOT6ZI4WMLTQHCFPRTFDQ2A7PPABH44 }
+       ]
+     }
+   }
+
+   authorization {
+     auth_callout {
+       issuer: $CAIRN_NATS_AUTH_ISSUER
+       account: CAIRN
+       auth_users: [ cairn-core ]
+     }
+   }
+   ```
+
+3. Start core with `CAIRN_NATS_USERNAME=cairn-core`, the same
+   `CAIRN_NATS_PASSWORD`, `CAIRN_NATS_AUTH_CALLOUT=true` and
+   `CAIRN_NATS_WORKER_ACCOUNT=CAIRN`. Core does not start if the auth-callout
+   is on and the account is missing.
+4. Create an enrollment per worker and set `CAIRN_WORKER_ENROLLMENT_TOKEN` on
+   it.
+
+The Garmin worker cannot present an enrollment token. Give it a static user
+in the `CAIRN` account, add that user to `auth_users`, and grant it the
+[permissions](#nats-permissions) for provider `garmin`.
 
 ## Strava (Go)
 
@@ -122,10 +188,9 @@ key `<name>-<provider>` (for example `strava-fetcher-strava`). For a provider
 
 The job subjects are exact: core publishes `cairn.jobs.fetch_source.<p>` with
 nothing after the provider, so consumers must filter on that subject (a
-`cairn.jobs.fetch_source.<p>.>` filter matches nothing). Core before 0.3.0
-granted a narrower template under which enrolled workers could not pull jobs;
-run core v0.3.0 or later with NATS auth. Installations running NATS without
-auth are unaffected.
+`cairn.jobs.fetch_source.<p>.>` filter matches nothing). Run core v0.3.1 or
+later with NATS auth; earlier versions did not admit enrolled workers.
+Installations running NATS without auth are unaffected.
 
 If you give a worker a static NATS user instead (the Garmin worker connects
 with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD`), grant that user the same

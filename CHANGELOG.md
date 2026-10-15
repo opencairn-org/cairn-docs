@@ -4,7 +4,7 @@ All notable changes to the Cairn documentation site are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/). Dates are
 ISO-8601. The site version tracks the Cairn release it documents.
 
-## [0.2.6] — 2026-09-29
+## [0.2.6] — 2026-10-15
 
 Documents Cairn core v0.2.6 and the provider workers strava v0.2.4 / garmin
 v0.2.2.
@@ -17,6 +17,11 @@ v0.2.2.
 ### Changed
 - Self-host → Providers: a request body that is not valid JSON is answered
   with `400`; leaving the body out still works.
+- `npm run check` gates every change and deploy: Prettier, ESLint, the full
+  site build, dependency audit, licenses, gitleaks. Node is pinned in `.nvmrc`
+  and npm install scripts are disabled.
+- The deploy workflow pins its actions by commit and keeps no credentials on
+  disk.
 
 ### Fixed
 - The enrollment example uses the path and body the server accepts, the
@@ -30,8 +35,8 @@ v0.2.2.
 
 ### Security
 - Build dependencies updated within their ranges; npm overrides lift
-  `serialize-javascript` to 7.x and `uuid` to 11.x, which the bundler and the
-  dev server pin below their patched releases.
+  `serialize-javascript` to 7.x, `uuid` to 11.x and `tinypool` to 2.x, which
+  the bundler and the dev server pin below their patched releases.
 
 ## [0.2.5.1] — 2026-09-11
 

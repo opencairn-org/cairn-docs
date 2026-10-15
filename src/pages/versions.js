@@ -1,4 +1,3 @@
-import React from 'react';
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
@@ -43,8 +42,8 @@ export default function Versions() {
         <p>
           Every Cairn release keeps its own frozen copy of this documentation.
           Pick the version that matches the core you run; the newest release is
-          what the site shows by default, and the switch in the navbar moves
-          the page you are reading to another version.
+          what the site shows by default, and the switch in the navbar moves the
+          page you are reading to another version.
         </p>
 
         <section className="margin-bottom--lg">

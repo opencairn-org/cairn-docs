@@ -11,7 +11,8 @@ The fastest way to see Cairn running locally.
 ## Prerequisites
 
 - Docker + Docker Compose
-- (For development) Go 1.26 and Node 24+
+- (For development) Go 1.27, Node 24 and, for the Garmin worker,
+  [uv](https://docs.astral.sh/uv/)
 
 ## Run the stack
 
@@ -39,16 +40,16 @@ one(s) you need against the dev stack:
 ```bash
 # Strava (Go) — in cairn-provider-strava
 export CAIRN_NATS_URL=nats://localhost:4222
-export CAIRN_WORKER_ENROLLMENT_TOKEN=...   # from POST /api/admin/worker-enrollments
+export CAIRN_WORKER_NAME=strava-fetcher
+export CAIRN_WORKER_ENROLLMENT_TOKEN=...   # only with NATS auth-callout; from POST /api/admin/worker-enrollments
 go run ./cmd/worker-strava
 
 # Garmin (Python) — in cairn-provider-garmin
-pip install -r requirements.txt
+uv sync --locked
 export CAIRN_NATS_URL=nats://localhost:4222
 export CAIRN_GARMIN_EMAIL=you@example.com   # dev fallback; production delivers per-user credentials over NATS
 export CAIRN_GARMIN_PASSWORD=...
-export PYTHONPATH=.
-python -m cairn_garmin.main
+uv run python -m cairn_garmin.main
 ```
 
 :::tip

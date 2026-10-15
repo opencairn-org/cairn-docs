@@ -12,9 +12,27 @@ startup. This page lists every variable the server reads, with its default in
 the second column. A dash means the variable has no default and stays unset
 unless you provide it.
 
+Only the `CAIRN_`-prefixed name is read. Up to 0.2.x a missing `CAIRN_*`
+variable fell back to the bare name, so host variables such as `URL`,
+`USERNAME`, `PASSWORD` or `SESSION_SECRET` could fill Cairn settings; since
+0.3.0 they are ignored. Rename any unprefixed variables you relied on before
+upgrading.
+
 Three variables are **required**: `CAIRN_DATABASE_URL`,
 `CAIRN_AUTH_SESSION_SECRET` and `CAIRN_AUTH_MASTER_ENCRYPTION_KEY`. The server
-refuses to start without them.
+refuses to start when one is missing **or set to an empty value**. An optional
+variable set to an empty value means empty, not its default: `CAIRN_NATS_URL=`
+keeps NATS disabled.
+
+`cairn config help` prints every variable the config struct reads, with its
+type, default and whether it is required:
+
+```bash
+docker run --rm ghcr.io/johnnycube/cairn-core:v0.3.0 config help
+```
+
+The OIDC variables (keyed by provider id) and `CAIRN_HTTP_RATE_LIMIT_PER_MIN`
+are read separately and do not appear in that list.
 
 :::tip
 `dev.env.example` in `cairn-core` is a working local set for the Compose dev
@@ -43,7 +61,7 @@ stack. Copy it to `dev.env`; `make dev-server` sources it.
 | `CAIRN_HTTP_TLS_CERT_FILE` / `..._TLS_KEY_FILE` | — | terminate TLS in-process instead of at a proxy |
 | `CAIRN_HTTP_READ_TIMEOUT` / `..._WRITE_TIMEOUT` / `..._IDLE_TIMEOUT` | `30s` / `5m` / `120s` | server timeouts; the write timeout is long because uploads and exports stream |
 | `CAIRN_HTTP_SHUTDOWN_TIMEOUT` | `30s` | grace period on SIGTERM |
-| `CAIRN_HTTP_RATE_LIMIT_PER_MIN` | `600` | requests per minute per session (per IP when anonymous); generous so the polling web UI is never throttled |
+| `CAIRN_HTTP_RATE_LIMIT_PER_MIN` | `600` | requests per minute per session (per IP when anonymous); generous so the polling web UI is never throttled. Values that are not a positive number are ignored |
 
 ## Auth
 
@@ -93,7 +111,7 @@ provider. List the provider ids, then configure each one under its own prefix.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `CAIRN_NATS_URL` | `nats://localhost:4222` | |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | set it to an empty value to run without NATS: no workers, no scheduler |
 | `CAIRN_NATS_CLUSTER_NAME` | — | optional guard against pointing at the wrong cluster |
 | `CAIRN_NATS_CLIENT_NAME` | `cairn-server` | connection name shown in NATS monitoring |
 | `CAIRN_NATS_CREDS_FILE` / `..._USERNAME` / `..._PASSWORD` | — | credentials (prod: nkey/JWT creds file) |
@@ -111,8 +129,8 @@ provider. List the provider ids, then configure each one under its own prefix.
 | `CAIRN_STORAGE_BUCKET` | `cairn` | |
 | `CAIRN_STORAGE_ACCESS_KEY_ID` / `..._SECRET_ACCESS_KEY` | — | when both are empty, core runs without blob storage: no raw-file uploads, no photos, no cached map snapshots |
 | `CAIRN_STORAGE_USE_PATH_STYLE` | `true` | path-style addressing (MinIO, Garage); `false` for virtual-hosted buckets |
-| `CAIRN_STORAGE_PRESIGN_TTL` | `15m` | lifetime of presigned download links |
-| `CAIRN_STORAGE_TRANSFER_EXPIRY_DAYS` | `1` | how long export bundles stay downloadable |
+| `CAIRN_STORAGE_PRESIGN_TTL` | `15m` | lifetime of the presigned upload and download URLs handed to clients and workers |
+| `CAIRN_STORAGE_TRANSFER_EXPIRY_DAYS` | `1` | bucket lifecycle rule for claim-checked worker results under `transfer/`; core deletes them right after ingest, the rule only reaps orphans |
 
 ## Maps
 
@@ -170,7 +188,7 @@ The scheduler drives periodic provider reconciles and webhook drift checks.
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `CAIRN_FEDERATION_ENABLED` | `false` | ActivityPub federation. Off keeps federation fully dormant: no remote activities in feeds and no "Federated" feed filter. See [Social & federation](/using-cairn/social) |
-| `CAIRN_FEDERATION_ALLOW_PRIVATE_HOSTS` | `false` | allow remote instances on private or loopback addresses — only for local testing |
+| `CAIRN_FEDERATION_ALLOW_PRIVATE_HOSTS` | `false` | lift the [outbound address guard](#outbound-requests) for federation fetches and deliveries, so instances on private or loopback addresses can reach each other — only for local testing |
 
 ## Quotas and logging
 
@@ -179,6 +197,39 @@ The scheduler drives periodic provider reconciles and webhook drift checks.
 | `CAIRN_QUOTA_MAX_ACTIVITIES_PER_USER` | `0` | `0` means unlimited |
 | `CAIRN_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 | `CAIRN_LOG_FORMAT` | `json` | `json` or `text` |
+
+## Request limits
+
+These limits are fixed in the server, not configurable:
+
+| Request | Limit | Over the limit |
+| --- | --- | --- |
+| Connect-RPC message (web UI, gRPC, gRPC-Web clients) | 4 MiB per message | rejected by Connect (`resource_exhausted`) |
+| File upload, `POST /api/activities/upload` | 64 MiB file, plus 1 MiB multipart framing | `400` |
+| Attachment, `POST /api/activities/{id}/attachments` | 32 MiB file, plus 1 MiB framing and caption | `400` |
+| JSON request bodies of the REST API and MCP requests | 1 MiB | `400` |
+| Provider webhook deliveries, `POST /webhooks/{provider}` | 1 MiB | `413` |
+
+A body over the limit is refused, not truncated.
+
+## Outbound requests
+
+Federation fetches and deliveries and notification webhooks go through an
+address guard that refuses to connect to anything that is not public unicast:
+loopback, private (RFC 1918, `fc00::/7`), link-local and every other IANA
+special-purpose range, among them CGNAT `100.64.0.0/10` (including the
+`100.100.100.200` cloud metadata endpoint), `0.0.0.0/8`, `192.0.0.0/24`, the
+documentation and benchmarking ranges, `240.0.0.0/4`, NAT64 (`64:ff9b::/96`,
+`64:ff9b:1::/48`), 6to4 `2002::/16`, Teredo (`2001::/23`) and any IPv6 address
+outside `2000::/3`. IPv4-mapped IPv6 addresses are judged as their IPv4
+address. The check runs on the resolved address at dial time, so DNS names
+that point inward are refused too, and a webhook URL is validated against the
+same guard when it is saved. Redirects are capped, and every hop is dialed
+through the same guard.
+
+`CAIRN_FEDERATION_ALLOW_PRIVATE_HOSTS=true` turns the guard off for federation
+only (and makes WebFinger lookups use plain HTTP); notification webhooks stay
+guarded.
 
 ## Worker variables
 

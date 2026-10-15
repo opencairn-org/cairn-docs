@@ -25,14 +25,17 @@ adapter. The dependency rule is the one rule that keeps the codebase clean.
 
 ## Surfaces
 
-- **Connect-RPC + REST** — both are live and user-facing.
-- **Web UI** — a SvelteKit CSR SPA embedded into the prod binary.
+- **Connect-RPC + REST** — both are live and user-facing. The Connect server
+  is built on connect-go v2 and speaks the Connect, gRPC and gRPC-Web
+  protocols; each message is capped at 4 MiB.
+- **Web UI** — a SvelteKit 3 CSR SPA embedded into the prod binary.
 - **NATS + JetStream** — the async control plane between core and the workers.
 
 ## Stack
 
-Go 1.26 · Postgres 17 + TimescaleDB + PostGIS · pgx/v5 · goose migrations ·
-NATS/JetStream · SvelteKit + Connect-Web + MapLibre + uPlot.
+Go 1.27 · connect-go v2 · Postgres 17 + TimescaleDB + PostGIS · pgx/v5 ·
+goose migrations · NATS/JetStream · SvelteKit 3 + Connect-Web + MapLibre +
+uPlot.
 
 Read on: [the ingest pipeline](/architecture/pipeline) and
 [provider workers](/architecture/workers).

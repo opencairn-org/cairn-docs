@@ -29,6 +29,14 @@ subjects on the `CAIRN_RESULTS` interest stream — see
 
 - The worker connects to NATS with an enrollment token (production,
   auth-callout) or static/anonymous credentials (dev).
+- Under auth-callout the worker MUST stay within core's standard permission
+  template: the exact job and result subjects of §3–§7 for its provider, its
+  own `cairn.workers.<worker_key>.>`, `cairn.cmd.worker.<worker_key>.>` and
+  webhook subjects, and the JetStream API subjects for its pull consumers on
+  `CAIRN_JOBS` / `CAIRN_WEBHOOKS` and the presence, manifest and rate-limit KV
+  buckets. The full list is on
+  [Self-host → Providers](/self-host/providers#nats-permissions). Anything
+  else is refused with `Permissions Violation`.
 - Identity triple: **provider** (e.g. `garmin`), **package** (stable build
   identity, e.g. `cairn.workers.garmin`), **version** (incrementing integer).
   Together they form core's update-available / re-parse-eligibility key.
@@ -52,7 +60,11 @@ manage-view liveness.
 ## 3. Job consumption — MUST
 
 Create a **durable pull consumer** on `CAIRN_JOBS` for **every** job subject
-of your provider that core publishes:
+of your provider that core publishes. Filter each consumer on the exact
+subject: core publishes `cairn.jobs.fetch_source.<provider>` with nothing
+after the provider, so a `cairn.jobs.fetch_source.<provider>.>` filter matches
+nothing, and the permission template only allows filtered consumer creation
+to the subjects below:
 
 | Subject | Required | Purpose |
 |---|---|---|
@@ -130,6 +142,15 @@ the import queue):
 
 Event-free results (reconcile watermark, backfill stamps) publish inline.
 
+**Publish routing — SHOULD:** results and `fetch_source` sub-jobs go to
+JetStream streams (`CAIRN_RESULTS`, `CAIRN_JOBS`) and need a JetStream
+publish with a `Nats-Msg-Id`; token, credential, presign and discover
+subjects are core NATS request/reply. Decide per subject before publishing —
+look up whether a stream covers it (`$JS.API.STREAM.NAMES` with a subject
+filter, granted by the template) and cache the answer — instead of trying a
+JetStream publish first: a JetStream publish to a core-only subject waits for
+an ack that never comes and delivers twice on retry.
+
 Presign/upload failures are **transient** (NAK + retry) — never drop a
 result body silently.
 
@@ -173,7 +194,8 @@ item sits `in_progress` until the stale reaper masks the cause as
 
 ## 8. Discover — MUST
 
-Respond to plain request/reply on `cairn.discover.<provider>`:
+Subscribe to and respond on plain request/reply `cairn.discover.<provider>`
+(the template allows subscribing to it):
 
 Request: `{"account_id": "…", "start_page": 1}`
 Reply: `{"items": [{"item_type": "activity", "external_id": "…",

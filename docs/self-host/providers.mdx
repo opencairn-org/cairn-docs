@@ -53,7 +53,7 @@ docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
   -e CAIRN_WORKER_NAME=strava-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
-  ghcr.io/johnnycube/cairn-provider-strava:latest
+  ghcr.io/johnnycube/cairn-provider-strava:v0.3.0
 ```
 
 Only one Strava worker instance should own the webhook subject — set
@@ -64,7 +64,7 @@ Only one Strava worker instance should own the webhook subject — set
 | `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` for authenticated servers |
 | `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | one-time enrollment token from `POST /api/admin/worker-enrollments` |
 | `CAIRN_WORKER_NAME` | `strava-fetcher` | must equal the enrollment's `name` |
-| `CAIRN_WORKER_INSTANCE_ID` | generated | stable id when you run several instances |
+| `CAIRN_WORKER_INSTANCE_ID` | the hostname | stable id when you run several instances |
 | `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` | — | set on exactly one instance |
 | `CAIRN_STRAVA_TOKEN_URL` | Strava's | override for testing against a mock |
 | `CAIRN_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
@@ -79,23 +79,63 @@ with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` when set, otherwise anonymously.
 ```bash
 docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
-  ghcr.io/johnnycube/cairn-provider-garmin:latest
+  -v garmin-tokens:/data \
+  ghcr.io/johnnycube/cairn-provider-garmin:v0.3.0
 ```
 
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` are used when set |
 | `CAIRN_WORKER_NAME` | `garmin-fetcher` | shared by every instance of the worker |
-| `CAIRN_WORKER_INSTANCE_ID` | generated | unique per instance; in Kubernetes set it to the pod name so a restart reuses its presence key |
+| `CAIRN_WORKER_INSTANCE_ID` | random 12-hex id | unique per instance; in Kubernetes set it to the pod name so a restart reuses its presence key |
 | `CAIRN_HEARTBEAT_INTERVAL_S` | `20` | presence heartbeat to the `cairn_worker_presence` KV |
 | `CAIRN_PULL_BATCH` | `4` | jobs pulled per fetch |
-| `CAIRN_GARTH_HOME` | `/tmp/cairn-garth` | Garth token store, keeps the Garmin session between jobs; mount a volume so MFA accounts are not re-prompted on every restart |
+| `CAIRN_GARTH_HOME` | `/data/garth` in the image, `~/.cache/cairn-garth` outside it | Garth token store, one subdirectory per account; keeps the Garmin session between jobs. Mount a volume on `/data` so MFA accounts are not re-prompted on every restart |
 | `CAIRN_GARMIN_EMAIL` / `..._PASSWORD` | — | **dev fallback only** — in production each user's credentials are delivered over NATS |
-| `CAIRN_PROTO_PATH` | `<repo>/proto` | location of the committed proto stubs |
+| `CAIRN_PROTO_PATH` | `/opt/cairn-proto` in the image, `<repo>/proto` outside it | location of the committed proto stubs |
+
+The image runs as the unprivileged user `cairn` (uid/gid 10001) and declares
+`/data` as a volume. The token directory must be readable and writable by that
+uid: a fresh named volume or an `emptyDir` already is; a volume or bind mount
+written by an image before 0.2.3 (which ran as root) needs
+`chown -R 10001:10001` once, and in Kubernetes a persistent volume needs
+`securityContext.fsGroup: 10001` on the pod. Without it the worker cannot read
+or write cached tokens and logs in to Garmin on every job.
+
+The worker cannot answer an MFA prompt. For MFA accounts, seed the token store
+once with an interactive login as described in the
+[worker README](https://github.com/johnnycube/cairn-provider-garmin#mfa-accounts),
+then mount it.
+
+## NATS permissions
+
+When NATS runs with auth-callout, an enrolled worker gets core's **standard
+permission template**, derived from the enrollment's provider and its worker
+key `<name>-<provider>` (for example `strava-fetcher-strava`). For a provider
+`<p>` and worker key `<wk>` it allows:
+
+| | Subjects |
+| --- | --- |
+| Subscribe | `cairn.jobs.{fetch_source,parse_blob,backfill,reconcile,import_metrics}.<p>`, `cairn.cmd.worker.<wk>.>`, `cairn.discover.<p>` (serving discover requests), `cairn.webhooks.<wk>.event`, `cairn.webhooks.<wk>.verify`, `_INBOX.>` |
+| Publish | `cairn.results.{fetch_source,parse_blob,backfill,import_metrics}.<p>`, `cairn.results.reconcile.<p>.*` (account-suffixed), `cairn.jobs.fetch_source.<p>` (sub-jobs from reconcile and webhooks), `cairn.workers.<wk>.>`, `cairn.tokens.<p>.>`, `cairn.creds.<p>.get`, `cairn.blobs.presign_upload.<p>`, `cairn.blobs.presign_download.<p>`, `cairn.accounts.lookup_by_provider_ext`, `_INBOX.>` |
+| JetStream API | `$JS.API.STREAM.NAMES` (stream lookup by subject); consumer create on `CAIRN_JOBS` filtered to the five job subjects above and on `CAIRN_WEBHOOKS` filtered to `cairn.webhooks.<wk>.event`, plus `$JS.API.CONSUMER.DURABLE.CREATE.CAIRN_JOBS.*`; consumer info, `MSG.NEXT` and `$JS.ACK.<stream>.>` on both streams; stream info, direct get, message get and `$KV.<bucket>.>` on the `cairn_worker_presence`, `cairn_worker_manifests` and `cairn_rate_limits` KV buckets |
+
+The job subjects are exact: core publishes `cairn.jobs.fetch_source.<p>` with
+nothing after the provider, so consumers must filter on that subject (a
+`cairn.jobs.fetch_source.<p>.>` filter matches nothing). Core before 0.3.0
+granted a narrower template under which enrolled workers could not pull jobs;
+run core v0.3.0 or later with NATS auth. Installations running NATS without
+auth are unaffected.
+
+If you give a worker a static NATS user instead (the Garmin worker connects
+with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD`), grant that user the same
+subjects for its provider.
 
 ## Writing your own provider
 
-A provider only needs to: register via enrollment, consume
-`cairn.jobs.*.<provider>`, and publish `cairn.worker.v1.JobResult` events. Use
+A provider only needs to: register via enrollment, consume the
+`cairn.jobs.<job_type>.<provider>` subjects, and publish
+`cairn.worker.v1.JobResult` events, staying within the
+[permissions](#nats-permissions) above. Use
 the committed proto stubs (Go or Python) as your contract. See
 [Provider workers](/architecture/workers).

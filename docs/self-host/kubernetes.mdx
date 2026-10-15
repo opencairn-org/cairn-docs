@@ -38,7 +38,23 @@ deploy/k8s/
 2. Set `CAIRN_HTTP_PUBLIC_BASE_URL` in `config.yaml` and the host in
    `ingress.yaml` to your domain. They must match: OIDC redirects, webhook
    callbacks and share/reset links derive from it.
-3. Apply the secrets first (they are not part of the kustomization), then the
+3. Pin the images in `kustomization.yaml`. The bundle tagged v0.3.0 still
+   pins core v0.2.6, Strava v0.2.5 and Garmin v0.2.2, so set `newTag` to the
+   release you deploy; for this release:
+
+   ```yaml title="kustomization.yaml"
+   images:
+     - name: ghcr.io/johnnycube/cairn-core
+       newTag: v0.3.0
+     - name: ghcr.io/johnnycube/cairn-provider-strava
+       newTag: v0.3.0
+     - name: ghcr.io/johnnycube/cairn-provider-garmin
+       newTag: v0.3.0
+   ```
+
+   or `kustomize edit set image ghcr.io/johnnycube/cairn-core:v0.3.0` and
+   likewise for the workers.
+4. Apply the secrets first (they are not part of the kustomization), then the
    bundle:
 
    ```bash
@@ -49,7 +65,7 @@ deploy/k8s/
    The `cairn-migrate` Job runs `migrate up` before core serves traffic; core
    refuses to start against an older schema. Re-running it is a no-op; after
    a version bump, delete and re-apply the Job.
-4. Verify with `kubectl -n cairn get pods`,
+5. Verify with `kubectl -n cairn get pods`,
    `kubectl -n cairn logs job/cairn-migrate` and
    `kubectl -n cairn rollout status deploy/cairn-core`, then log in at the
    Ingress host as the bootstrap admin
@@ -73,7 +89,10 @@ the Secret.
   bundle mounts it as an `emptyDir`, so a restarted pod logs in again from the
   credentials delivered over NATS. Mount a persistent volume there if MFA
   accounts should not be re-prompted on every restart (see
-  [Providers](/self-host/providers)). Replicas do not share it.
+  [Providers](/self-host/providers)). Replicas do not share it. The image runs
+  as uid/gid 10001; an `emptyDir` is writable for it, a persistent volume
+  needs `securityContext.fsGroup: 10001` on the pod (or a one-off
+  `chown -R 10001:10001` if it holds files from an older, root-run image).
 - Postgres, NATS and MinIO are single-instance in the bundle. For HA, swap in
   a Postgres operator (e.g. CloudNativePG), a NATS cluster and distributed
   MinIO or a managed S3 bucket, and point the same env at them.
@@ -84,7 +103,10 @@ the Secret.
   networks enable enrollment-token auth-callout: bootstrap the account key
   (`POST /api/admin/nats/bootstrap-account-key`), put the returned public key
   in `nats.conf`, and set `CAIRN_WORKER_ENROLLMENT_TOKEN` on the Strava worker
-  (see [Providers](/self-host/providers#enrollment)).
+  (see [Providers](/self-host/providers#enrollment)). Enrolled workers get the
+  [standard permission template](/self-host/providers#nats-permissions); it
+  covers every job subject and JetStream API call the workers make from core
+  v0.3.0 on.
 - `secrets.example.yaml` uses plain `stringData`; use SealedSecrets, External
   Secrets or SOPS for real clusters. Back up
   `CAIRN_AUTH_MASTER_ENCRYPTION_KEY` separately from the database, it

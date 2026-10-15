@@ -81,9 +81,6 @@ callout. Worker enrollment under NATS auth requires core v0.3.1 or later.
        users: [
          # core itself; listed in auth_users, so it bypasses the callout
          { user: cairn-core, password: $CAIRN_NATS_PASSWORD }
-         # seedless placeholder: makes nats-server send the connect nonce the
-         # Strava worker needs; generate your own with `nk -gen user -pubout`
-         { nkey: UBZQLXX3CXHIQZ2VZ4WSKLWB3DOT6ZI4WMLTQHCFPRTFDQ2A7PPABH44 }
        ]
      }
    }
@@ -101,12 +98,23 @@ callout. Worker enrollment under NATS auth requires core v0.3.1 or later.
    `CAIRN_NATS_PASSWORD`, `CAIRN_NATS_AUTH_CALLOUT=true` and
    `CAIRN_NATS_WORKER_ACCOUNT=CAIRN`. Core does not start if the auth-callout
    is on and the account is missing.
-4. Create an enrollment per worker and set `CAIRN_WORKER_ENROLLMENT_TOKEN` on
-   it.
+4. Create an enrollment per worker (its `name` equal to the worker's
+   `CAIRN_WORKER_NAME`) and set `CAIRN_WORKER_ENROLLMENT_TOKEN` on it. The
+   Strava and Garmin workers (v0.3.1 or later) both present only the token on
+   CONNECT.
 
-The Garmin worker cannot present an enrollment token. Give it a static user
-in the `CAIRN` account, add that user to `auth_users`, and grant it the
-[permissions](#nats-permissions) for provider `garmin`.
+Strava workers up to v0.3.0 also present an nkey and fail unless nats-server
+sends a connect nonce. For them, add a seedless placeholder nkey user to the
+`CAIRN` users, e.g.
+`{ nkey: UBZQLXX3CXHIQZ2VZ4WSKLWB3DOT6ZI4WMLTQHCFPRTFDQ2A7PPABH44 }` (generate
+your own with `nk -gen user -pubout`); core's `docker/nats-auth-callout.conf`
+still contains one. Strava v0.3.1 and Garmin v0.3.1 do not need it.
+
+A worker can still use a static NATS user (`CAIRN_NATS_USER` /
+`CAIRN_NATS_PASSWORD`) instead, for example on a server without the
+auth-callout; under the auth-callout add that user to the `CAIRN` account and
+to `auth_users`. Grant it the [permissions](#nats-permissions) for its
+provider.
 
 ## Strava (Go)
 
@@ -119,7 +127,7 @@ docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
   -e CAIRN_WORKER_NAME=strava-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
-  ghcr.io/johnnycube/cairn-provider-strava:v0.3.0
+  ghcr.io/johnnycube/cairn-provider-strava:v0.3.1
 ```
 
 Only one Strava worker instance should own the webhook subject — set
@@ -139,20 +147,24 @@ Only one Strava worker instance should own the webhook subject — set
 
 Repo: **cairn-provider-garmin**. Garmin has no public activity OAuth API, so the
 worker uses the `garminconnect` library (Garth SSO). Per-user credentials are
-delivered over NATS. The worker does not use an enrollment token; it connects
+delivered over NATS. Like the Strava worker it enrolls with
+`CAIRN_WORKER_ENROLLMENT_TOKEN` (v0.3.1 or later); without a token it connects
 with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` when set, otherwise anonymously.
 
 ```bash
 docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
+  -e CAIRN_WORKER_NAME=garmin-fetcher \
+  -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
   -v garmin-tokens:/data \
-  ghcr.io/johnnycube/cairn-provider-garmin:v0.3.0
+  ghcr.io/johnnycube/cairn-provider-garmin:v0.3.1
 ```
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` are used when set |
-| `CAIRN_WORKER_NAME` | `garmin-fetcher` | shared by every instance of the worker |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` are used when set and no enrollment token is |
+| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | enrollment token from `POST /api/admin/worker-enrollments` (provider `garmin`); takes precedence over user/password |
+| `CAIRN_WORKER_NAME` | `garmin-fetcher` | must equal the enrollment's `name`; shared by every instance of the worker |
 | `CAIRN_WORKER_INSTANCE_ID` | random 12-hex id | unique per instance; in Kubernetes set it to the pod name so a restart reuses its presence key |
 | `CAIRN_HEARTBEAT_INTERVAL_S` | `20` | presence heartbeat to the `cairn_worker_presence` KV |
 | `CAIRN_PULL_BATCH` | `4` | jobs pulled per fetch |
@@ -192,9 +204,8 @@ nothing after the provider, so consumers must filter on that subject (a
 later with NATS auth; earlier versions did not admit enrolled workers.
 Installations running NATS without auth are unaffected.
 
-If you give a worker a static NATS user instead (the Garmin worker connects
-with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD`), grant that user the same
-subjects for its provider.
+If you give a worker a static NATS user instead (`CAIRN_NATS_USER` /
+`CAIRN_NATS_PASSWORD`), grant that user the same subjects for its provider.
 
 ## Writing your own provider
 

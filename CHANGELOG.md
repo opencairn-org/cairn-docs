@@ -4,6 +4,25 @@ All notable changes to the Cairn documentation site are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/). Dates are
 ISO-8601. The site version tracks the Cairn release it documents.
 
+## [0.3.2] — 2026-10-15
+
+Documents Cairn core v0.3.1 with the provider workers strava v0.3.1 / garmin
+v0.3.1.
+
+### Changed
+- Self-host → Providers: both workers enroll with
+  `CAIRN_WORKER_ENROLLMENT_TOKEN`; the Garmin section documents the token, and
+  the static NATS user workaround for Garmin is gone (a short note keeps
+  user/password for servers without the auth-callout). The auth-callout
+  nats.conf drops the placeholder nkey user, which only Strava v0.3.0 and
+  earlier need.
+- Self-host → Overview, Kubernetes, Providers: worker images pinned to strava
+  v0.3.1 and garmin v0.3.1; the Compose sketch passes one enrollment token per
+  worker; upgrading to 0.3.1 covers the worker versions.
+- Getting started: the Garmin worker's `CAIRN_WORKER_ENROLLMENT_TOKEN`.
+- Architecture → Workers: auth-callout issues a provider-scoped user JWT.
+- Snapshot 0.3.2.
+
 ## [0.3.1] — 2026-10-15
 
 Documents Cairn core v0.3.1 with the provider workers strava v0.3.0 / garmin

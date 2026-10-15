@@ -49,11 +49,14 @@ services:
     ports: ["8080:8080"]
     depends_on: [postgres, nats]
   worker-strava:
-    image: ghcr.io/johnnycube/cairn-provider-strava:v0.3.0
+    image: ghcr.io/johnnycube/cairn-provider-strava:v0.3.1
     env_file: .env
+    # one enrollment per worker, only with NATS auth-callout
+    environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${STRAVA_ENROLLMENT_TOKEN:-}" }
   worker-garmin:
-    image: ghcr.io/johnnycube/cairn-provider-garmin:v0.3.0
+    image: ghcr.io/johnnycube/cairn-provider-garmin:v0.3.1
     env_file: .env
+    environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${GARMIN_ENROLLMENT_TOKEN:-}" }
     volumes: ["garmin-tokens:/data"]
   postgres:
     image: timescale/timescaledb-ha:pg17-ts2.27
@@ -65,7 +68,7 @@ volumes:
 
 Pin the image tags to a release rather than `latest`, and upgrade core and the
 workers together; this page documents core v0.3.1 with the Strava worker
-v0.3.0 and the Garmin worker v0.3.0.
+v0.3.1 and the Garmin worker v0.3.1.
 
 The Garmin worker runs as the unprivileged user `cairn` (uid/gid 10001) and
 keeps its Garmin token cache under `/data`. A new named volume is created with
@@ -93,6 +96,10 @@ from your instance.
   `CAIRN_NATS_AUTH_CALLOUT=true` and `CAIRN_NATS_WORKER_ACCOUNT` set; follow
   the [auth-callout setup](/self-host/providers#nats-auth-callout). Without
   NATS auth nothing changes.
+- With the auth-callout, run Strava v0.3.1 and Garmin v0.3.1: both enroll
+  with `CAIRN_WORKER_ENROLLMENT_TOKEN` alone. The placeholder nkey user in
+  nats.conf is only needed for Strava v0.3.0 and earlier, and the Garmin
+  worker no longer needs a static NATS user.
 
 ## Upgrading to 0.3.0
 

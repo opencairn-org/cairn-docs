@@ -21,8 +21,8 @@ dependency.
 
 ## What a worker does
 
-- **Registers** via the enrollment-token flow (NATS auth-callout mints scoped
-  nkey credentials).
+- **Registers** via the enrollment-token flow (NATS auth-callout admits the
+  token and issues a user JWT scoped to the worker's provider).
 - **Consumes** its provider's jobs through durable pull consumers on the exact
   `cairn.jobs.<job_type>.<provider>` subjects (`fetch_source`, `reconcile`,
   `parse_blob`, `import_metrics`, `backfill`) and serves

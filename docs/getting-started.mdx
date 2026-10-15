@@ -47,6 +47,7 @@ go run ./cmd/worker-strava
 # Garmin (Python) — in cairn-provider-garmin
 uv sync --locked
 export CAIRN_NATS_URL=nats://localhost:4222
+export CAIRN_WORKER_ENROLLMENT_TOKEN=...   # only with NATS auth-callout; from POST /api/admin/worker-enrollments
 export CAIRN_GARMIN_EMAIL=you@example.com   # dev fallback; production delivers per-user credentials over NATS
 export CAIRN_GARMIN_PASSWORD=...
 uv run python -m cairn_garmin.main

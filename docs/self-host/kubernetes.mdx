@@ -47,9 +47,9 @@ deploy/k8s/
      - name: ghcr.io/johnnycube/cairn-core
        newTag: v0.3.1
      - name: ghcr.io/johnnycube/cairn-provider-strava
-       newTag: v0.3.0
+       newTag: v0.3.1
      - name: ghcr.io/johnnycube/cairn-provider-garmin
-       newTag: v0.3.0
+       newTag: v0.3.1
    ```
 
    or `kustomize edit set image ghcr.io/johnnycube/cairn-core:v0.3.1` and
@@ -109,9 +109,9 @@ the Secret.
   3. add `CAIRN_NATS_USERNAME=cairn-core`, `CAIRN_NATS_PASSWORD`,
      `CAIRN_NATS_AUTH_CALLOUT=true` and `CAIRN_NATS_WORKER_ACCOUNT=CAIRN` to
      core;
-  4. create an enrollment (name and provider) and set
-     `CAIRN_WORKER_ENROLLMENT_TOKEN` on the Strava worker; give the Garmin
-     worker a static NATS user as described there.
+  4. create an enrollment (name and provider) per worker and set its
+     `CAIRN_WORKER_ENROLLMENT_TOKEN` on the Strava and the Garmin worker
+     (both v0.3.1 or later).
 
   Enrolled workers get the
   [standard permission template](/self-host/providers#nats-permissions).

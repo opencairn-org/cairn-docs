@@ -38,21 +38,21 @@ deploy/k8s/
 2. Set `CAIRN_HTTP_PUBLIC_BASE_URL` in `config.yaml` and the host in
    `ingress.yaml` to your domain. They must match: OIDC redirects, webhook
    callbacks and share/reset links derive from it.
-3. Pin the images in `kustomization.yaml`. The bundle tagged v0.3.0 still
+3. Pin the images in `kustomization.yaml`. The bundle tagged v0.3.1 still
    pins core v0.2.6, Strava v0.2.5 and Garmin v0.2.2, so set `newTag` to the
    release you deploy; for this release:
 
    ```yaml title="kustomization.yaml"
    images:
      - name: ghcr.io/johnnycube/cairn-core
-       newTag: v0.3.0
+       newTag: v0.3.1
      - name: ghcr.io/johnnycube/cairn-provider-strava
        newTag: v0.3.0
      - name: ghcr.io/johnnycube/cairn-provider-garmin
        newTag: v0.3.0
    ```
 
-   or `kustomize edit set image ghcr.io/johnnycube/cairn-core:v0.3.0` and
+   or `kustomize edit set image ghcr.io/johnnycube/cairn-core:v0.3.1` and
    likewise for the workers.
 4. Apply the secrets first (they are not part of the kustomization), then the
    bundle:
@@ -100,13 +100,21 @@ the Secret.
 ## Hardening
 
 - The bundle runs NATS unauthenticated on the cluster network. For untrusted
-  networks enable enrollment-token auth-callout: bootstrap the account key
-  (`POST /api/admin/nats/bootstrap-account-key`), put the returned public key
-  in `nats.conf`, and set `CAIRN_WORKER_ENROLLMENT_TOKEN` on the Strava worker
-  (see [Providers](/self-host/providers#enrollment)). Enrolled workers get the
-  [standard permission template](/self-host/providers#nats-permissions); it
-  covers every job subject and JetStream API call the workers make from core
-  v0.3.0 on.
+  networks enable enrollment-token auth-callout (core v0.3.1 or later):
+  1. bootstrap the account key (`POST /api/admin/nats/bootstrap-account-key`);
+  2. replace `nats.conf` in the `nats-config` ConfigMap with the
+     [auth-callout config](/self-host/providers#nats-auth-callout) and set
+     `CAIRN_NATS_AUTH_ISSUER` (the returned public key) and
+     `CAIRN_NATS_PASSWORD` on the NATS container, from a Secret;
+  3. add `CAIRN_NATS_USERNAME=cairn-core`, `CAIRN_NATS_PASSWORD`,
+     `CAIRN_NATS_AUTH_CALLOUT=true` and `CAIRN_NATS_WORKER_ACCOUNT=CAIRN` to
+     core;
+  4. create an enrollment (name and provider) and set
+     `CAIRN_WORKER_ENROLLMENT_TOKEN` on the Strava worker; give the Garmin
+     worker a static NATS user as described there.
+
+  Enrolled workers get the
+  [standard permission template](/self-host/providers#nats-permissions).
 - `secrets.example.yaml` uses plain `stringData`; use SealedSecrets, External
   Secrets or SOPS for real clusters. Back up
   `CAIRN_AUTH_MASTER_ENCRYPTION_KEY` separately from the database, it

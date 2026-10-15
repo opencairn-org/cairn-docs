@@ -28,7 +28,7 @@ keeps NATS disabled.
 type, default and whether it is required:
 
 ```bash
-docker run --rm ghcr.io/johnnycube/cairn-core:v0.3.0 config help
+docker run --rm ghcr.io/johnnycube/cairn-core:v0.3.1 config help
 ```
 
 The OIDC variables (keyed by provider id) and `CAIRN_HTTP_RATE_LIMIT_PER_MIN`
@@ -119,6 +119,8 @@ provider. List the provider ids, then configure each one under its own prefix.
 | `CAIRN_NATS_CONNECT_TIMEOUT` / `..._RECONNECT_WAIT` / `..._MAX_RECONNECTS` | `10s` / `2s` / `-1` | `-1` reconnects forever |
 | `CAIRN_NATS_JOB_ACK_WAIT` | `5m` | ack window of the consumers core creates on `CAIRN_RESULTS`; also the TTL of the credentials auth-callout issues to workers. Job consumers are created by the workers with their own AckWait (Strava worker 2 min, Garmin worker 30 s), see the [provider contract](/architecture/provider-contract) |
 | `CAIRN_NATS_JOB_MAX_DELIVER` | `5` | redeliveries before a job lands in the dead-letter stream |
+| `CAIRN_NATS_AUTH_CALLOUT` | `false` | answer NATS auth-callout requests and admit enrolled workers, see [NATS auth-callout](/self-host/providers#nats-auth-callout) |
+| `CAIRN_NATS_WORKER_ACCOUNT` | — | the nats.conf account admitted workers join, the one core connects to (e.g. `CAIRN`); required when `CAIRN_NATS_AUTH_CALLOUT=true` |
 
 ## Storage (S3-compatible, optional)
 

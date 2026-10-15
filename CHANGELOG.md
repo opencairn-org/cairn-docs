@@ -4,6 +4,26 @@ All notable changes to the Cairn documentation site are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/). Dates are
 ISO-8601. The site version tracks the Cairn release it documents.
 
+## [0.3.1] — 2026-10-15
+
+Documents Cairn core v0.3.1 with the provider workers strava v0.3.0 / garmin
+v0.3.0.
+
+### Added
+- Self-host → Providers: NATS auth-callout setup (the nats.conf with the
+  `auth_callout` block and the shared `CAIRN` account, the core settings, the
+  static user for the Garmin worker) and the "re-enroll required" note.
+- Self-host → Configuration: `CAIRN_NATS_AUTH_CALLOUT` and
+  `CAIRN_NATS_WORKER_ACCOUNT`.
+- Self-host → Overview: upgrading to 0.3.1.
+
+### Changed
+- Self-host → Providers: worker enrollments require `provider`; the API
+  example and field list include it.
+- Self-host → Kubernetes: the hardening steps for NATS auth now produce a
+  working setup; core is pinned to v0.3.1.
+- Snapshot 0.3.1.
+
 ## [0.3.0] — 2026-10-15
 
 Documents Cairn core v0.3.0 and the provider workers strava v0.3.0 / garmin

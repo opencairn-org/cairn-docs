@@ -6,3 +6,8 @@ useDefault = true
 description = "Placeholder tokens in docs examples (cairn_pat_...)"
 regexTarget = "match"
 regexes = ['''cairn_pat_\.\.\.''']
+
+[[allowlists]]
+description = "Seedless NATS user public key in the auth-callout nats.conf example"
+regexTarget = "match"
+regexes = ['''UBZQLXX3CXHIQZ2VZ4WSKLWB3DOT6ZI4WMLTQHCFPRTFDQ2A7PPABH44''']

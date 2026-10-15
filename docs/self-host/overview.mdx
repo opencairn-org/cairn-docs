@@ -44,7 +44,7 @@ there is nothing else to serve.
 ```yaml title="docker-compose.yml (sketch)"
 services:
   core:
-    image: ghcr.io/johnnycube/cairn-core:v0.3.0
+    image: ghcr.io/johnnycube/cairn-core:v0.3.1
     env_file: .env
     ports: ["8080:8080"]
     depends_on: [postgres, nats]
@@ -64,7 +64,7 @@ volumes:
 ```
 
 Pin the image tags to a release rather than `latest`, and upgrade core and the
-workers together; this page documents core v0.3.0 with the Strava worker
+workers together; this page documents core v0.3.1 with the Strava worker
 v0.3.0 and the Garmin worker v0.3.0.
 
 The Garmin worker runs as the unprivileged user `cairn` (uid/gid 10001) and
@@ -82,6 +82,17 @@ from the forwarded headers. See [Configuration](/self-host/configuration) for
 the full variable list — in particular the three required secrets and the map
 tile settings if you would rather not hit the public OpenStreetMap tile server
 from your instance.
+
+## Upgrading to 0.3.1
+
+- Creating a worker enrollment requires a `provider`. Enrollments made
+  before 0.3.1 have none; core refuses them at connect and the admin list
+  marks them **re-enroll required**. Create new ones (see
+  [Providers](/self-host/providers#re-enroll-required)).
+- Core answers NATS auth-callout requests only with
+  `CAIRN_NATS_AUTH_CALLOUT=true` and `CAIRN_NATS_WORKER_ACCOUNT` set; follow
+  the [auth-callout setup](/self-host/providers#nats-auth-callout). Without
+  NATS auth nothing changes.
 
 ## Upgrading to 0.3.0
 

@@ -13,7 +13,7 @@ need.
 
 ## Enrollment
 
-In production the Strava worker authenticates to NATS with a one-time
+In production each worker authenticates to NATS with a one-time
 **enrollment token** (NATS auth-callout mints scoped credentials; set it up
 as described in [NATS auth-callout](#nats-auth-callout)). Create an
 enrollment as an admin, in the admin UI (**Worker onboarding**) or over the
@@ -30,24 +30,38 @@ curl -X POST https://cairn.example/api/admin/worker-enrollments \
 - `name` (required): the worker name — lowercase letters, digits and hyphens,
   no leading or trailing hyphen. The worker's `CAIRN_WORKER_NAME` must equal
   it.
-- `provider` (required): the provider the worker serves, `strava` or
-  `garmin`. It scopes the worker's NATS permissions. A missing or unknown
-  provider is answered with `400` (`provider is required (one of: garmin,
-  strava)`).
+- `provider` (required): the provider type the worker serves, set by the
+  admin. It scopes the worker's NATS permissions. Any well-formed type is
+  accepted, not only `strava` and `garmin`: 1–48 lowercase letters, digits,
+  hyphens or underscores (`[a-z0-9_-]`), so it can't carry NATS wildcards or
+  subject separators. A missing or malformed provider is answered with `400`
+  (`provider required — lowercase letters, digits, hyphens, underscores`).
+  Since core v0.3.2; before that only the built-in providers were accepted.
 - `expires_in_hours` (optional): defaults to `8760` (365 days), which is also
   the cap.
 - `note` (optional): free text shown in the admin list.
 
 The `201` response carries the enrollment record and the plaintext `token`,
-shown once. Pass it to the worker as `CAIRN_WORKER_ENROLLMENT_TOKEN`.
-`GET /api/admin/worker-enrollments` lists enrollments and the accepted
-`providers`,
+shown once. The worker's configuration is `CAIRN_WORKER_NAME` (the `name`)
+plus the token from the admin as `CAIRN_WORKER_ENROLLMENT_TOKEN`.
+`GET /api/admin/worker-enrollments` lists enrollments and `providers`, the
+built-in providers as suggestions (the admin UI offers them in the provider
+field, which also takes any other well-formed type),
 `POST /api/admin/worker-enrollments/{id}/revoke` revokes one and
 `POST /api/admin/worker-enrollments/{id}/prolong` moves its expiry, even after
 it has lapsed. Both take an optional JSON body: `{"reason": "..."}` for revoke,
 `{"expires_in_hours": 720}` for prolong, with the same default and cap of
 `8760`. The body can be left out; one that is not valid JSON is answered with
 `400`.
+
+### Other providers
+
+A worker for a provider core does not ship (say `polar`) is enrolled the same
+way: the admin creates an enrollment with `"provider": "polar"` and hands the
+worker its name and token. It is admitted and scoped to the `polar` subjects
+only (`cairn.jobs.*.polar`, `cairn.tokens.polar.>`, …), never another
+provider's. Linking user accounts for a new provider still needs core
+support: OAuth connect and job dispatch use core's built-in provider list.
 
 ### Re-enroll required
 

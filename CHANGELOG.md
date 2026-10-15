@@ -4,6 +4,23 @@ All notable changes to the Cairn documentation site are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/). Dates are
 ISO-8601. The site version tracks the Cairn release it documents.
 
+## [0.3.3] — 2026-10-15
+
+Documents Cairn core v0.3.2 with the provider workers strava v0.3.1 / garmin
+v0.3.1.
+
+### Changed
+- Self-host → Providers: any well-formed provider type (1–48 of
+  `[a-z0-9_-]`) can be enrolled, not only `strava` and `garmin`; the admin
+  sets it on the enrollment, and `providers` in the enrollment list are
+  suggestions. The worker's configuration is `CAIRN_WORKER_NAME` plus the
+  token from the admin. New section "Other providers": account linking for a
+  new provider still needs core support.
+- Architecture → Provider contract: the admin-set, format-checked provider.
+- Self-host → Overview, Kubernetes, Configuration: core pinned to v0.3.2;
+  "Upgrading to 0.3.2".
+- Snapshot 0.3.3.
+
 ## [0.3.2] — 2026-10-15
 
 Documents Cairn core v0.3.1 with the provider workers strava v0.3.1 / garmin

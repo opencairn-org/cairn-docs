@@ -44,7 +44,7 @@ there is nothing else to serve.
 ```yaml title="docker-compose.yml (sketch)"
 services:
   core:
-    image: ghcr.io/johnnycube/cairn-core:v0.3.1
+    image: ghcr.io/johnnycube/cairn-core:v0.3.2
     env_file: .env
     ports: ["8080:8080"]
     depends_on: [postgres, nats]
@@ -67,7 +67,7 @@ volumes:
 ```
 
 Pin the image tags to a release rather than `latest`, and upgrade core and the
-workers together; this page documents core v0.3.1 with the Strava worker
+workers together; this page documents core v0.3.2 with the Strava worker
 v0.3.1 and the Garmin worker v0.3.1.
 
 The Garmin worker runs as the unprivileged user `cairn` (uid/gid 10001) and
@@ -85,6 +85,13 @@ from the forwarded headers. See [Configuration](/self-host/configuration) for
 the full variable list — in particular the three required secrets and the map
 tile settings if you would rather not hit the public OpenStreetMap tile server
 from your instance.
+
+## Upgrading to 0.3.2
+
+- Worker enrollments accept any well-formed provider type (1–48 of
+  `[a-z0-9_-]`), not only `strava` and `garmin`; the admin UI suggests the
+  built-in ones. Nothing to migrate. Account linking for a new provider still
+  needs core support (see [Other providers](/self-host/providers#other-providers)).
 
 ## Upgrading to 0.3.1
 

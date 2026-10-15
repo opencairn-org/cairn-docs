@@ -28,7 +28,10 @@ subjects on the `CAIRN_RESULTS` interest stream — see
 ## 1. Identity and connection
 
 - The worker connects to NATS with an enrollment token (production,
-  auth-callout) or static/anonymous credentials (dev).
+  auth-callout) or static/anonymous credentials (dev). The admin sets the
+  provider on the enrollment; any well-formed type (`[a-z0-9_-]`, 1–48
+  chars) is accepted, so a new provider's worker can enroll without a core
+  change.
 - Under auth-callout the worker MUST stay within core's standard permission
   template: the exact job and result subjects of §3–§7 for its provider, its
   own `cairn.workers.<worker_key>.>`, `cairn.cmd.worker.<worker_key>.>` and

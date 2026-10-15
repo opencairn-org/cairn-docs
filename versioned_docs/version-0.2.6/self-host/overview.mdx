@@ -1,0 +1,68 @@
+---
+id: overview
+title: Self-host overview
+sidebar_position: 1
+---
+
+# Self-host overview
+
+Cairn is built to be self-hosted. A production deployment is:
+
+- **cairn-core** — one distroless container. It serves the Connect-RPC + REST
+  API and the embedded SvelteKit web UI, runs migrations, and is the server
+  side of the NATS control plane.
+- **Postgres 17** with **TimescaleDB** (streams) and **PostGIS** (segments).
+- **NATS + JetStream** — the worker control plane and async job/result bus.
+- **An S3-compatible object store** (MinIO, Garage, AWS S3, …) for raw blobs
+  and photos. Optional — core runs without it, you just lose blob upload.
+- **Provider workers** — one container per provider you use
+  (`cairn-provider-strava`, `cairn-provider-garmin`), each a separate process.
+
+```
+                +-------------------+
+   web UI  ───▶ |     cairn-core    | ──▶ Postgres (Timescale + PostGIS)
+   API     ───▶ |  (API + web UI)   | ──▶ S3 (blobs, photos)
+                +---------+---------+
+                          │ NATS + JetStream (jobs / results / tokens)
+              ┌───────────┴───────────┐
+              ▼                       ▼
+      cairn-provider-strava     cairn-provider-garmin
+```
+
+## Choose a path
+
+- [Docker Compose](#docker-compose) — simplest single-host deployment.
+- [Kubernetes](/self-host/kubernetes) — manifests for a cluster.
+- [Configuration](/self-host/configuration) — environment variables.
+- [Providers](/self-host/providers) — wiring Strava and Garmin.
+
+## Docker Compose
+
+Pull the published images and run them together. Core embeds the web UI, so
+there is nothing else to serve.
+
+```yaml title="docker-compose.yml (sketch)"
+services:
+  core:
+    image: ghcr.io/johnnycube/cairn-core:latest
+    env_file: .env
+    ports: ["8080:8080"]
+    depends_on: [postgres, nats]
+  worker-strava:
+    image: ghcr.io/johnnycube/cairn-provider-strava:latest
+    env_file: .env
+  worker-garmin:
+    image: ghcr.io/johnnycube/cairn-provider-garmin:latest
+    env_file: .env
+  postgres:
+    image: timescale/timescaledb-ha:pg17-ts2.27
+  nats: { image: nats:2-alpine, command: ["-js"] }
+  minio: { image: minio/minio, command: ["server", "/data"] }
+```
+
+Put a TLS-terminating reverse proxy (Caddy, nginx, Traefik) in front of core,
+and set `CAIRN_INSTANCE_TRUSTED_PROXIES` to its address so client IPs are read
+from the forwarded headers. See [Configuration](/self-host/configuration) for
+the full variable list — in particular the three required secrets and the map
+tile settings if you would rather not hit the public OpenStreetMap tile server
+from your instance.

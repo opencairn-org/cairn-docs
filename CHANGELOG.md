@@ -4,6 +4,40 @@ All notable changes to the Cairn documentation site are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/). Dates are
 ISO-8601. The site version tracks the Cairn release it documents.
 
+## [0.2.6] — 2026-10-15
+
+Documents Cairn core v0.2.6 and the provider workers strava v0.2.4 / garmin
+v0.2.2.
+
+### Added
+- Self-host → Providers: `POST /api/admin/worker-enrollments/{id}/prolong`,
+  and the optional JSON bodies of revoke and prolong.
+- Versioned docs snapshot `0.2.6`.
+
+### Changed
+- Self-host → Providers: a request body that is not valid JSON is answered
+  with `400`; leaving the body out still works.
+- `npm run check` gates every change and deploy: Prettier, ESLint, the full
+  site build, dependency audit, licenses, gitleaks. Node is pinned in `.nvmrc`
+  and npm install scripts are disabled.
+- The deploy workflow pins its actions by commit and keeps no credentials on
+  disk.
+
+### Fixed
+- The enrollment example uses the path and body the server accepts, the
+  Garmin worker defaults match its configuration, and the export routes are
+  named `export.gpx` / `.tcx` / `.fit` plus `export/options`.
+- `CAIRN_STRAVA_CLIENT_ID`, `CAIRN_STRAVA_CLIENT_SECRET` and
+  `CAIRN_NATS_STREAM_RETENTION_DAYS` are gone from the reference; nothing
+  read them.
+- Self-host → Kubernetes lists all twelve manifests and the Garmin token store
+  volume.
+
+### Security
+- Build dependencies updated within their ranges; npm overrides lift
+  `serialize-javascript` to 7.x, `uuid` to 11.x and `tinypool` to 2.x, which
+  the bundler and the dev server pin below their patched releases.
+
 ## [0.2.5.1] — 2026-09-11
 
 Site only, no content change: a version switch in the navbar (with an "All

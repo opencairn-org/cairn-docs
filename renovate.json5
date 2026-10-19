@@ -1,4 +1,4 @@
-// Renovate configuration for github.com/johnnycube/cairn-docs
+// Renovate configuration for github.com/opencairn-org/cairn-docs
 // Validate locally: npx --yes --package renovate -- renovate-config-validator renovate.json5
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',

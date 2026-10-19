@@ -141,7 +141,7 @@ docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
   -e CAIRN_WORKER_NAME=strava-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
-  ghcr.io/opencairn-org/cairn-provider-strava:v0.3.1
+  ghcr.io/opencairn-org/cairn-provider-strava:v0.3.2
 ```
 
 Only one Strava worker instance should own the webhook subject — set
@@ -171,7 +171,7 @@ docker run --rm \
   -e CAIRN_WORKER_NAME=garmin-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
   -v garmin-tokens:/data \
-  ghcr.io/opencairn-org/cairn-provider-garmin:v0.3.1
+  ghcr.io/opencairn-org/cairn-provider-garmin:v0.3.2
 ```
 
 | Variable | Default | Notes |

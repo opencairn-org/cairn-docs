@@ -4,6 +4,18 @@ All notable changes to the Cairn documentation site are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/). Dates are
 ISO-8601. The site version tracks the Cairn release it documents.
 
+## [0.3.4] — 2026-10-19
+
+Documents Cairn core v0.3.3 with the provider workers strava v0.3.2 / garmin
+v0.3.2.
+
+### Changed
+- All repository links and image references point to the `opencairn-org`
+  GitHub organization and `ghcr.io/opencairn-org`.
+- Self-host → Overview, Kubernetes, Configuration, Providers: core pinned to
+  v0.3.3, workers to v0.3.2; "Upgrading to 0.3.3" (the image registry move).
+- Snapshot 0.3.4.
+
 ## [0.3.3] — 2026-10-15
 
 Documents Cairn core v0.3.2 with the provider workers strava v0.3.1 / garmin
@@ -208,4 +220,5 @@ https://docs.opencairn.org), covering Cairn v0.2.0.
   worker contract**.
 - Integrations: OAuth and MCP.
 
+[0.3.4]: https://github.com/opencairn-org/cairn-docs/releases/tag/v0.3.4
 [0.2.0]: https://github.com/johnnycube/cairn-docs/releases/tag/v0.2.0

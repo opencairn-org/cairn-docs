@@ -44,17 +44,17 @@ there is nothing else to serve.
 ```yaml title="docker-compose.yml (sketch)"
 services:
   core:
-    image: ghcr.io/opencairn-org/cairn-core:v0.3.2
+    image: ghcr.io/opencairn-org/cairn-core:v0.3.3
     env_file: .env
     ports: ["8080:8080"]
     depends_on: [postgres, nats]
   worker-strava:
-    image: ghcr.io/opencairn-org/cairn-provider-strava:v0.3.1
+    image: ghcr.io/opencairn-org/cairn-provider-strava:v0.3.2
     env_file: .env
     # one enrollment per worker, only with NATS auth-callout
     environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${STRAVA_ENROLLMENT_TOKEN:-}" }
   worker-garmin:
-    image: ghcr.io/opencairn-org/cairn-provider-garmin:v0.3.1
+    image: ghcr.io/opencairn-org/cairn-provider-garmin:v0.3.2
     env_file: .env
     environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${GARMIN_ENROLLMENT_TOKEN:-}" }
     volumes: ["garmin-tokens:/data"]
@@ -67,8 +67,8 @@ volumes:
 ```
 
 Pin the image tags to a release rather than `latest`, and upgrade core and the
-workers together; this page documents core v0.3.2 with the Strava worker
-v0.3.1 and the Garmin worker v0.3.1.
+workers together; this page documents core v0.3.3 with the Strava worker
+v0.3.2 and the Garmin worker v0.3.2.
 
 The Garmin worker runs as the unprivileged user `cairn` (uid/gid 10001) and
 keeps its Garmin token cache under `/data`. A new named volume is created with
@@ -85,6 +85,14 @@ from the forwarded headers. See [Configuration](/self-host/configuration) for
 the full variable list — in particular the three required secrets and the map
 tile settings if you would rather not hit the public OpenStreetMap tile server
 from your instance.
+
+## Upgrading to 0.3.3
+
+- The project moved to the `opencairn-org` GitHub organization. Pull the
+  images from `ghcr.io/opencairn-org/` (`cairn-core`, `cairn-provider-strava`,
+  `cairn-provider-garmin`); the `ghcr.io/johnnycube/` namespace keeps the tags
+  published so far as a frozen mirror and receives no new versions. Update
+  image pins and Renovate rules; nothing else to migrate.
 
 ## Upgrading to 0.3.2
 

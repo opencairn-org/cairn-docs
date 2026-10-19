@@ -141,7 +141,7 @@ docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
   -e CAIRN_WORKER_NAME=strava-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
-  ghcr.io/johnnycube/cairn-provider-strava:v0.3.1
+  ghcr.io/opencairn-org/cairn-provider-strava:v0.3.1
 ```
 
 Only one Strava worker instance should own the webhook subject — set
@@ -171,7 +171,7 @@ docker run --rm \
   -e CAIRN_WORKER_NAME=garmin-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
   -v garmin-tokens:/data \
-  ghcr.io/johnnycube/cairn-provider-garmin:v0.3.1
+  ghcr.io/opencairn-org/cairn-provider-garmin:v0.3.1
 ```
 
 | Variable | Default | Notes |
@@ -196,7 +196,7 @@ or write cached tokens and logs in to Garmin on every job.
 
 The worker cannot answer an MFA prompt. For MFA accounts, seed the token store
 once with an interactive login as described in the
-[worker README](https://github.com/johnnycube/cairn-provider-garmin#mfa-accounts),
+[worker README](https://github.com/opencairn-org/cairn-provider-garmin#mfa-accounts),
 then mount it.
 
 ## NATS permissions

@@ -7,7 +7,7 @@ import {
 } from '@docusaurus/plugin-content-docs/client';
 
 const changelogUrl = (version) =>
-  `https://github.com/johnnycube/cairn-core/blob/v${version.name}/CHANGELOG.md`;
+  `https://github.com/opencairn-org/cairn-core/blob/v${version.name}/CHANGELOG.md`;
 
 function VersionRows({versions}) {
   return versions.map((version) => (

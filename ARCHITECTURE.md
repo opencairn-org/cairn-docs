@@ -1,6 +1,6 @@
 # Architecture
 
-cairn-docs is the documentation of [Cairn](https://github.com/johnnycube/cairn-core),
+cairn-docs is the documentation of [Cairn](https://github.com/opencairn-org/cairn-core),
 published at <https://docs.opencairn.org>. It is a static
 [Docusaurus](https://docusaurus.io/) site; nothing runs server-side.
 

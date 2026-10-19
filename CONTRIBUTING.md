@@ -1,7 +1,7 @@
 # Contributing to cairn-docs
 
 Corrections and additions are welcome. Bugs in Cairn itself belong to
-[cairn-core](https://github.com/johnnycube/cairn-core).
+[cairn-core](https://github.com/opencairn-org/cairn-core).
 
 ## License of contributions
 

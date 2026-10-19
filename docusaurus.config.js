@@ -14,7 +14,7 @@ const config = {
   url: 'https://docs.opencairn.org',
   baseUrl: '/',
 
-  organizationName: 'johnnycube',
+  organizationName: 'opencairn-org',
   projectName: 'cairn-docs',
 
   onBrokenLinks: 'warn',
@@ -37,7 +37,7 @@ const config = {
         docs: {
           sidebarPath: './sidebars.js',
           routeBasePath: '/', // docs are the site root
-          editUrl: 'https://github.com/johnnycube/cairn-docs/tree/main/',
+          editUrl: 'https://github.com/opencairn-org/cairn-docs/tree/main/',
           // Versioned docs: each Cairn release gets a frozen snapshot under
           // versioned_docs/ (npx docusaurus docs:version X.Y.Z) and is
           // selectable from the navbar switch and /versions. The newest entry
@@ -95,7 +95,7 @@ const config = {
             ],
           },
           {
-            href: 'https://github.com/johnnycube/cairn-core',
+            href: 'https://github.com/opencairn-org/cairn-core',
             label: 'Source',
             position: 'right',
           },
@@ -119,15 +119,15 @@ const config = {
             items: [
               {
                 label: 'cairn-core',
-                href: 'https://github.com/johnnycube/cairn-core',
+                href: 'https://github.com/opencairn-org/cairn-core',
               },
               {
                 label: 'cairn-provider-strava',
-                href: 'https://github.com/johnnycube/cairn-provider-strava',
+                href: 'https://github.com/opencairn-org/cairn-provider-strava',
               },
               {
                 label: 'cairn-provider-garmin',
-                href: 'https://github.com/johnnycube/cairn-provider-garmin',
+                href: 'https://github.com/opencairn-org/cairn-provider-garmin',
               },
             ],
           },

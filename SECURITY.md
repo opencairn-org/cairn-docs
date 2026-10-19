@@ -9,7 +9,7 @@ Do not open a public issue. Email `security@johanneskueber.com` with "security"
 in the subject. Reports are acknowledged within 7 days.
 
 Vulnerabilities in Cairn itself belong to
-[cairn-core](https://github.com/johnnycube/cairn-core) or the provider
+[cairn-core](https://github.com/opencairn-org/cairn-core) or the provider
 repositories; the same address reaches the maintainers.
 
 ## Supported versions

@@ -1,0 +1,35 @@
+---
+id: import
+title: Importing activities
+sidebar_position: 1
+---
+
+# Importing activities
+
+Cairn pulls activities from four kinds of source, all funneled through one
+ingest pipeline:
+
+- **Strava** — connect your Strava app on the **Connections** screen; the
+  worker backfills history and receives webhooks for new activities.
+- **Garmin** — connect with your Garmin credentials; the worker syncs
+  activities (and health metrics: HRV, sleep, weight, steps, resting HR).
+- **File upload** — drag a `.gpx`, `.tcx` or `.fit` file (or several).
+- **Manual entry** — log a workout by hand (`POST /api/activities/manual`).
+
+Each provider account is an **external account**; you can link multiple
+accounts of the same provider.
+
+## What happens on import
+
+Every source — worker push, file upload, or manual create — goes through the
+same path:
+
+1. **Ingest** — identity-dedup, then persist the source + its stream atomically.
+2. **Re-cluster** — fuzzy-match and group sources that are the same workout.
+3. **Merge** — produce the activity by merging all sources (see
+   [Merging sources](/using-cairn/merge)).
+4. **Follow-ups** — best-efforts, segment matching + ranks, training load, and
+   PR notifications. Follow-ups never fail the durable ingest.
+
+So the same run recorded on a watch and on a phone, or imported from two
+providers, becomes **one activity** with the best data from each.

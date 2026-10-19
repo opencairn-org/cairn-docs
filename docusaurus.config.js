@@ -5,7 +5,40 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const config = {
   title: 'Cairn Docs',
   tagline: 'Self-host, use, and extend your multi-source activity tracker',
-  favicon: 'img/favicon.ico',
+  // The Cairn icon from cairn-core (web/static); SVG first, PNG/ICO fallbacks
+  favicon: 'img/favicon.svg',
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/png',
+        sizes: '32x32',
+        href: '/img/favicon-32x32.png',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/png',
+        sizes: '16x16',
+        href: '/img/favicon-16x16.png',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {rel: 'alternate icon', href: '/img/favicon.ico'},
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'apple-touch-icon',
+        sizes: '180x180',
+        href: '/img/apple-touch-icon.png',
+      },
+    },
+  ],
 
   future: {
     v4: true,

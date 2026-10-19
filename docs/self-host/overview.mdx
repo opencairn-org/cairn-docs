@@ -44,17 +44,17 @@ there is nothing else to serve.
 ```yaml title="docker-compose.yml (sketch)"
 services:
   core:
-    image: ghcr.io/johnnycube/cairn-core:v0.3.2
+    image: ghcr.io/opencairn-org/cairn-core:v0.3.2
     env_file: .env
     ports: ["8080:8080"]
     depends_on: [postgres, nats]
   worker-strava:
-    image: ghcr.io/johnnycube/cairn-provider-strava:v0.3.1
+    image: ghcr.io/opencairn-org/cairn-provider-strava:v0.3.1
     env_file: .env
     # one enrollment per worker, only with NATS auth-callout
     environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${STRAVA_ENROLLMENT_TOKEN:-}" }
   worker-garmin:
-    image: ghcr.io/johnnycube/cairn-provider-garmin:v0.3.1
+    image: ghcr.io/opencairn-org/cairn-provider-garmin:v0.3.1
     env_file: .env
     environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${GARMIN_ENROLLMENT_TOKEN:-}" }
     volumes: ["garmin-tokens:/data"]

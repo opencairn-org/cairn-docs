@@ -12,4 +12,4 @@ labels: documentation
 
 **What it should say**
 
-<!-- Bugs in Cairn itself go to https://github.com/johnnycube/cairn-core/issues -->
+<!-- Bugs in Cairn itself go to https://github.com/opencairn-org/cairn-core/issues -->

@@ -1,6 +1,6 @@
 # cairn-docs
 
-Documentation for [Cairn](https://github.com/johnnycube/cairn-core) — the
+Documentation for [Cairn](https://github.com/opencairn-org/cairn-core) — the
 self-hosted, multi-source activity tracker. Published at
 [docs.opencairn.org](https://docs.opencairn.org). Built with
 [Docusaurus](https://docusaurus.io/).

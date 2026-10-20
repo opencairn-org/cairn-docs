@@ -4,15 +4,17 @@ All notable changes to the Cairn documentation site are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/). Dates are
 ISO-8601. The site version tracks the Cairn release it documents.
 
-## [0.3.5] — 2026-10-20
+## [0.3.6] — 2026-10-20
 
 Documents Cairn core v0.3.3 with the provider workers strava v0.3.2 / garmin
-v0.3.2 (unchanged).
+v0.3.2 (unchanged). Replaces 0.3.5, whose tag name became unusable on GitHub
+after a release object was published and withdrawn; same content.
 
 ### Changed
 - Favicon is the Cairn icon from cairn-core (SVG with PNG, ICO and
   apple-touch-icon fallbacks) instead of the Docusaurus default.
-- Snapshot 0.3.5.
+- Navbar logo uses the same Cairn icon as the favicon.
+- Snapshot 0.3.6.
 
 ## [0.3.4] — 2026-10-19
 
@@ -230,6 +232,6 @@ https://docs.opencairn.org), covering Cairn v0.2.0.
   worker contract**.
 - Integrations: OAuth and MCP.
 
-[0.3.5]: https://github.com/opencairn-org/cairn-docs/releases/tag/v0.3.5
+[0.3.6]: https://github.com/opencairn-org/cairn-docs/releases/tag/v0.3.6
 [0.3.4]: https://github.com/opencairn-org/cairn-docs/releases/tag/v0.3.4
 [0.2.0]: https://github.com/johnnycube/cairn-docs/releases/tag/v0.2.0

@@ -10,9 +10,11 @@ Cairn pulls activities from four kinds of source, all funneled through one
 ingest pipeline:
 
 - **Strava** — connect your Strava app on the **Connections** screen; the
-  worker backfills history and receives webhooks for new activities.
+  worker backfills history, receives webhooks for new activities and syncs
+  your [gear](/using-cairn/gear).
 - **Garmin** — connect with your Garmin credentials; the worker syncs
-  activities (and health metrics: HRV, sleep, weight, steps, resting HR).
+  activities, [gear](/using-cairn/gear) and health metrics (HRV, sleep,
+  weight, steps, resting HR).
 - **File upload** — drag a `.gpx`, `.tcx` or `.fit` file (or several).
 - **Manual entry** — log a workout by hand (`POST /api/activities/manual`).
 

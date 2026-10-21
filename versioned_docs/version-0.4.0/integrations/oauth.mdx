@@ -1,0 +1,66 @@
+---
+id: oauth
+title: OAuth 2.1 for apps & agents
+sidebar_position: 1
+---
+
+# OAuth 2.1 for apps & agents
+
+Cairn is both an **OIDC client** (you can log in *with* Google/Authentik/…) and
+an **OAuth 2.1 authorization server** (apps and agents log in *to* Cairn). The
+authorization-server side is what native mobile apps, third-party clients and
+[MCP](/integrations/mcp) agents use.
+
+## Why OAuth here
+
+Browsers use a session cookie; the CLI can use a Personal Access Token. But a
+native app or an AI agent should not hold your password or a god-mode token.
+OAuth 2.1 gives them a **scoped, revocable** grant via a proper consent flow.
+
+## Supported flows
+
+- **Authorization Code + PKCE** — for native (iOS/Android), SPAs and any
+  third-party client. PKCE is mandatory.
+- **Refresh tokens** — long-lived access without re-consent.
+- **Dynamic Client Registration (RFC 7591)** — clients (including MCP clients)
+  can self-register, no manual app setup.
+
+## Discovery
+
+Cairn publishes standard metadata so clients can configure themselves:
+
+- **Authorization Server Metadata** (RFC 8414):
+  `GET /.well-known/oauth-authorization-server`
+- **Protected Resource Metadata** (RFC 9728):
+  `GET /.well-known/oauth-protected-resource` — points resources (the API, the
+  MCP endpoint) at this authorization server.
+
+## Scopes
+
+Access tokens carry scopes; the API enforces them per call. Read-only access is
+the safe default for agents.
+
+| Scope | Grants |
+| --- | --- |
+| `activities:read` | list/read activities, streams, best-efforts, records |
+| `activities:write` | create/update/delete activities, overrides |
+| `profile:read` | read your profile + preferences |
+| `social:read` / `social:write` | feeds/kudos/comments |
+| `segments:read` | segments + leaderboards |
+| `training:read` | training-load curves |
+
+## Connecting a client (typical)
+
+1. Client fetches the AS metadata.
+2. Client registers (DCR) or uses a pre-registered `client_id`.
+3. Client starts Authorization Code + PKCE; you approve the requested scopes on
+   the **consent screen**.
+4. Client exchanges the code for an access + refresh token.
+5. Client calls the API with `Authorization: Bearer <access token>`.
+
+Manage authorized apps (and revoke them) from your account settings.
+
+:::note
+Sessions and Personal Access Tokens keep working for browsers and the CLI — the
+bearer access token is just a third path the same auth middleware understands.
+:::

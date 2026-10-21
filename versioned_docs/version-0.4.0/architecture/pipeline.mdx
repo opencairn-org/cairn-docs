@@ -1,0 +1,64 @@
+---
+id: pipeline
+title: The ingest pipeline
+sidebar_position: 2
+---
+
+# The ingest pipeline
+
+There is a **single ingest path** for every kind of source — worker push, file
+upload and manual create all funnel through it (`result_router.go`):
+
+```
+ingest (IngestActivityFromWorker)   identity dedup + persist source/stream (atomic)
+  → ReclusterBucket                 fuzzy-match + union-find group same-workout sources
+  → RecomputeActivityFromSources    domain.Merge over all non-detached sources
+  → follow-ups                      best-efforts, segments (+ranks), training load, PR notifs
+```
+
+## Durability rule
+
+The **ingest is durable**; **follow-ups never fail it**. Follow-ups run
+nil-tolerant and log on failure. This means a transient hiccup computing, say,
+training load can never lose your activity — it just gets recomputed later. Any
+new follow-up stage must hold to this pattern.
+
+## Async via NATS
+
+Workers and core communicate over NATS. Subjects are
+`cairn.<kind>.<job_type>.<provider>`, with the provider as the last token:
+
+- `cairn.jobs.<type>.<provider>` — work for a provider on the `CAIRN_JOBS`
+  work-queue stream: `fetch_source`, `reconcile`, `parse_blob`,
+  `import_metrics`, `backfill`. The subject is exact, e.g.
+  `cairn.jobs.fetch_source.strava`; workers also publish `fetch_source`
+  sub-jobs here from reconcile and webhooks.
+- `cairn.results.<type>.<provider>` — `JobResult` events back to core on the
+  `CAIRN_RESULTS` stream; reconcile results are account-suffixed,
+  `cairn.results.reconcile.<provider>.<external_account_id>`.
+- `cairn.discover.<provider>` — request/reply listing of importable items,
+  served by the worker.
+- `cairn.tokens.<provider>.*` / `cairn.creds.<provider>.get` — token and
+  credential exchange (request/reply, served by core).
+- `cairn.blobs.presign_upload.<provider>` / `..presign_download.<provider>` —
+  presigned S3 URLs for claim-checked results and raw blobs.
+- `cairn_worker_presence` (KV) — capability-manifest heartbeats.
+
+Core is the job producer + result consumer; a worker is the job consumer +
+result producer. The exact subjects and their semantics are in the
+[provider contract](/architecture/provider-contract).
+
+## Stream or core publish
+
+Some subjects are stored in JetStream streams (`cairn.jobs.>`,
+`cairn.results.>`, `cairn.events.>`, `cairn.dlq.>`, `cairn.webhooks.>`),
+others are plain request/reply subjects with a core NATS subscriber. Core's
+bus, and the Strava worker's, decide per subject before publishing: they look
+up whether a stream covers the subject (`$JS.API.STREAM.NAMES` with a subject
+filter), cache the answer, and use a JetStream publish (with `Nats-Msg-Id`
+dedup) for stream subjects and a core NATS publish for the rest. A miss is
+re-checked after a while, so a stream created later is picked up.
+
+Before core v0.3.0 / Strava v0.2.6 a JetStream publish to a core-only subject
+waited five seconds for an ack that never came and delivered the message twice
+on retry.

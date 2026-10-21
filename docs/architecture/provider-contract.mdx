@@ -75,6 +75,7 @@ to the subjects below:
 | `cairn.jobs.reconcile.<provider>` | MUST | catch new activity since watermark |
 | `cairn.jobs.parse_blob.<provider>` | MUST if raw blobs are archived | quota-free re-parse |
 | `cairn.jobs.import_metrics.<provider>` | MUST if manifest declares METRIC events | health metrics |
+| `cairn.jobs.import_gear.<provider>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
 | `cairn.jobs.backfill.<provider>` | MAY | legacy full-history walk |
 
 :::warning Why "every subject" is a MUST
@@ -119,6 +120,12 @@ auto-imported.
  "known_ext_ids": ["…", "…"]}
 ```
 
+`import_gear` (0.4.0): `{"job_id", "account_id", "user_id", "provider",
+"reason"}` — answer with one GEAR event per gear on the account, retired
+included. Core publishes it on account connect, on the user's "Sync gear"
+and alongside every reconcile, only when a live worker for the provider
+declares `Gear` in its manifest.
+
 `parse_blob`: as `fetch_source` plus
 `"blob": {"url": "<presigned GET>", "expires_at": "…", "fallback_handle": "<blob key>"}`
 — on an expired URL, re-presign via `cairn.blobs.presign_download.<provider>`
@@ -143,7 +150,20 @@ the import queue):
    inline events. Core fetches the object, ingests, and deletes it; a bucket
    lifecycle rule reaps orphans after ~1 day.
 
-Event-free results (reconcile watermark, backfill stamps) publish inline.
+Event-free results (reconcile watermark, backfill stamps) publish inline;
+`import_gear` results are small and MAY publish inline too.
+
+**Gear events (0.4.0) — MAY:** any result may carry
+`WORKER_EVENT_TYPE_GEAR` events (`ImportedGear{ref, payload: GearImport}`),
+keyed by `(external_account_id, external_id)`. They precede the activity
+that references them, like segments. The activity's
+`ActivitySourcePayload.gear_external_id` names the provider's gear id and
+`gear_name` is a display hint; the id MAY reference gear core has not seen
+yet (it is resolved once the gear arrives). Core never creates gear from a
+GEAR event on its own: an unknown record is stored pending and the user
+decides. Gear is optional data: a worker MUST NOT fail or delay an activity
+import because a gear lookup failed, and `ref.user_id` must be the owner of
+`external_account_id` (core rejects a mismatch).
 
 **Publish routing — SHOULD:** results and `fetch_source` sub-jobs go to
 JetStream streams (`CAIRN_RESULTS`, `CAIRN_JOBS`) and need a JetStream
@@ -160,7 +180,7 @@ result body silently.
 **Message-ids** (JetStream dedup): activity results
 `result:<job_id>:d<delivery_attempt>` (the attempt suffix lets a deferred
 retry re-publish past the dedup window; ingest is idempotent), reconcile
-results `result:<job_id>`, fetch_source sub-jobs enqueued by reconcile
+and `import_gear` results `result:<job_id>`, fetch_source sub-jobs enqueued by reconcile
 `reconcile:<provider>:<account_id>:<ext_id>`.
 
 **Stream hygiene — SHOULD:** emit strictly unique, ordered sample

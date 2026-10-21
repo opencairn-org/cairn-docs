@@ -44,17 +44,17 @@ there is nothing else to serve.
 ```yaml title="docker-compose.yml (sketch)"
 services:
   core:
-    image: ghcr.io/opencairn-org/cairn-core:v0.3.3
+    image: ghcr.io/opencairn-org/cairn-core:v0.4.0
     env_file: .env
     ports: ["8080:8080"]
     depends_on: [postgres, nats]
   worker-strava:
-    image: ghcr.io/opencairn-org/cairn-provider-strava:v0.3.2
+    image: ghcr.io/opencairn-org/cairn-provider-strava:v0.4.0
     env_file: .env
     # one enrollment per worker, only with NATS auth-callout
     environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${STRAVA_ENROLLMENT_TOKEN:-}" }
   worker-garmin:
-    image: ghcr.io/opencairn-org/cairn-provider-garmin:v0.3.2
+    image: ghcr.io/opencairn-org/cairn-provider-garmin:v0.4.0
     env_file: .env
     environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${GARMIN_ENROLLMENT_TOKEN:-}" }
     volumes: ["garmin-tokens:/data"]
@@ -67,8 +67,8 @@ volumes:
 ```
 
 Pin the image tags to a release rather than `latest`, and upgrade core and the
-workers together; this page documents core v0.3.3 with the Strava worker
-v0.3.2 and the Garmin worker v0.3.2.
+workers together; this page documents core v0.4.0 with the Strava worker
+v0.4.0 and the Garmin worker v0.4.0.
 
 The Garmin worker runs as the unprivileged user `cairn` (uid/gid 10001) and
 keeps its Garmin token cache under `/data`. A new named volume is created with
@@ -85,6 +85,21 @@ from the forwarded headers. See [Configuration](/self-host/configuration) for
 the full variable list — in particular the three required secrets and the map
 tile settings if you would rather not hit the public OpenStreetMap tile server
 from your instance.
+
+## Upgrading to 0.4.0
+
+- **Core first, then the workers.** Core 0.4.0 ignores unknown fields in job
+  results; a 0.4.0 worker talking to a 0.3.x core would fail every import.
+  Core 0.4.0 with 0.3.x workers is fine (no gear, nothing else changes).
+- Migration 00063 adds gear tables and `activities.gear_set_by`; gear that
+  was attached before (through the API) is kept and marked as set by the
+  user.
+- Gear from connected accounts arrives on the next reconcile or "Sync gear"
+  as pending records; users decide per record whether it is new gear or an
+  alias (see [Gear](/using-cairn/gear)). Strava activities imported before
+  0.4.0 get their gear after a reparse, Garmin activities after a reimport.
+- The Garmin worker makes one extra call per fetched activity for its gear;
+  set `CAIRN_GARMIN_FETCH_ACTIVITY_GEAR=false` to keep the old call count.
 
 ## Upgrading to 0.3.3
 

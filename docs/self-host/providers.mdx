@@ -141,11 +141,17 @@ docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
   -e CAIRN_WORKER_NAME=strava-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
-  ghcr.io/opencairn-org/cairn-provider-strava:v0.3.2
+  ghcr.io/opencairn-org/cairn-provider-strava:v0.4.0
 ```
 
 Only one Strava worker instance should own the webhook subject — set
 `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` on exactly one.
+
+Since 0.4.0 the worker imports [gear](/using-cairn/gear): every fetched
+activity carries its Strava gear, and `import_gear` lists the athlete's bikes
+and shoes with brand and model (one `GET /gear/{id}` per item). Archived
+activities carry the gear summary, so a reparse backfills gear on older
+imports without API calls.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
@@ -171,8 +177,15 @@ docker run --rm \
   -e CAIRN_WORKER_NAME=garmin-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
   -v garmin-tokens:/data \
-  ghcr.io/opencairn-org/cairn-provider-garmin:v0.3.2
+  ghcr.io/opencairn-org/cairn-provider-garmin:v0.4.0
 ```
+
+Since 0.4.0 the worker imports [gear](/using-cairn/gear): `import_gear`
+lists the account's gear with Garmin's per-sport defaults, and each fetched
+activity looks up the gear recorded on it (one extra Garmin call per
+activity; `CAIRN_GARMIN_FETCH_ACTIVITY_GEAR=false` switches that off for
+accounts that hit Garmin's limits). Archived responses carry no gear, so
+activities imported before 0.4.0 need a reimport to get it.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
@@ -184,6 +197,7 @@ docker run --rm \
 | `CAIRN_PULL_BATCH` | `4` | jobs pulled per fetch |
 | `CAIRN_GARTH_HOME` | `/data/garth` in the image, `~/.cache/cairn-garth` outside it | Garth token store, one subdirectory per account; keeps the Garmin session between jobs. Mount a volume on `/data` so MFA accounts are not re-prompted on every restart |
 | `CAIRN_GARMIN_EMAIL` / `..._PASSWORD` | — | **dev fallback only** — in production each user's credentials are delivered over NATS |
+| `CAIRN_GARMIN_FETCH_ACTIVITY_GEAR` | `true` | look up the gear recorded on each fetched activity (one extra call per activity) |
 | `CAIRN_PROTO_PATH` | `/opt/cairn-proto` in the image, `<repo>/proto` outside it | location of the committed proto stubs |
 
 The image runs as the unprivileged user `cairn` (uid/gid 10001) and declares
@@ -208,8 +222,8 @@ key `<name>-<provider>` (for example `strava-fetcher-strava`). For a provider
 
 | | Subjects |
 | --- | --- |
-| Subscribe | `cairn.jobs.{fetch_source,parse_blob,backfill,reconcile,import_metrics}.<p>`, `cairn.cmd.worker.<wk>.>`, `cairn.discover.<p>` (serving discover requests), `cairn.webhooks.<wk>.event`, `cairn.webhooks.<wk>.verify`, `_INBOX.>` |
-| Publish | `cairn.results.{fetch_source,parse_blob,backfill,import_metrics}.<p>`, `cairn.results.reconcile.<p>.*` (account-suffixed), `cairn.jobs.fetch_source.<p>` (sub-jobs from reconcile and webhooks), `cairn.workers.<wk>.>`, `cairn.tokens.<p>.>`, `cairn.creds.<p>.get`, `cairn.blobs.presign_upload.<p>`, `cairn.blobs.presign_download.<p>`, `cairn.accounts.lookup_by_provider_ext`, `_INBOX.>` |
+| Subscribe | `cairn.jobs.{fetch_source,parse_blob,backfill,reconcile,import_metrics,import_gear}.<p>`, `cairn.cmd.worker.<wk>.>`, `cairn.discover.<p>` (serving discover requests), `cairn.webhooks.<wk>.event`, `cairn.webhooks.<wk>.verify`, `_INBOX.>` |
+| Publish | `cairn.results.{fetch_source,parse_blob,backfill,import_metrics,import_gear}.<p>`, `cairn.results.reconcile.<p>.*` (account-suffixed), `cairn.jobs.fetch_source.<p>` (sub-jobs from reconcile and webhooks), `cairn.workers.<wk>.>`, `cairn.tokens.<p>.>`, `cairn.creds.<p>.get`, `cairn.blobs.presign_upload.<p>`, `cairn.blobs.presign_download.<p>`, `cairn.accounts.lookup_by_provider_ext`, `_INBOX.>` |
 | JetStream API | `$JS.API.STREAM.NAMES` (stream lookup by subject); consumer create on `CAIRN_JOBS` filtered to the five job subjects above and on `CAIRN_WEBHOOKS` filtered to `cairn.webhooks.<wk>.event`, plus `$JS.API.CONSUMER.DURABLE.CREATE.CAIRN_JOBS.*`; consumer info, `MSG.NEXT` and `$JS.ACK.<stream>.>` on both streams; stream info, direct get, message get and `$KV.<bucket>.>` on the `cairn_worker_presence`, `cairn_worker_manifests` and `cairn_rate_limits` KV buckets |
 
 The job subjects are exact: core publishes `cairn.jobs.fetch_source.<p>` with

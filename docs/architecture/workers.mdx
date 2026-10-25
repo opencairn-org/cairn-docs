@@ -23,10 +23,12 @@ dependency.
 
 - **Registers** via the enrollment-token flow (NATS auth-callout admits the
   token and issues a user JWT scoped to the worker's provider).
-- **Consumes** its provider's jobs through durable pull consumers on the exact
-  `cairn.jobs.<job_type>.<provider>` subjects (`fetch_source`, `reconcile`,
-  `parse_blob`, `import_metrics`, `backfill`) and serves
-  `cairn.discover.<provider>`.
+- **Consumes** its pool's jobs through durable pull consumers on the exact
+  `cairn.jobs.<job_type>.<provider>.<worker_name>` subjects (`fetch_source`,
+  `reconcile`, `parse_blob`, `import_metrics`, `import_gear`, `backfill`) and
+  serves `cairn.discover.<provider>.<worker_name>`. Instances sharing a
+  `worker_name` share the work; each connected account is assigned to one
+  pool.
 - **Fetches** from the provider's API (using per-user tokens or credentials
   delivered over NATS: `cairn.tokens.<provider>.*`,
   `cairn.creds.<provider>.get`).

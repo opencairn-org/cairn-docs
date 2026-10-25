@@ -52,6 +52,7 @@ const config = {
 
   onBrokenLinks: 'warn',
   markdown: {
+    mermaid: true,
     hooks: {
       onBrokenMarkdownLinks: 'warn',
     },
@@ -61,6 +62,9 @@ const config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
+
+  // Diagrams in ```mermaid fences (architecture/worker-routing).
+  themes: ['@docusaurus/theme-mermaid'],
 
   presets: [
     [

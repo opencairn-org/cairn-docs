@@ -71,6 +71,10 @@ A worker carries three independent versions (from 0.5.0):
   `min_parser_version` than its own MUST NAK it so a newer pooled instance
   takes it.
 - A legacy bare integer `N` reads as `N.0`.
+- **The archive MUST hold every input the parser uses**, so a re-parse
+  reproduces the import. A parser change needing a new input (e.g. a
+  separate gear call) first archives it — additive, still dataset `N`;
+  older archives lack it and need one re-fetch.
 
 What core offers per source, given the live workers:
 

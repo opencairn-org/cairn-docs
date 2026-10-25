@@ -1,0 +1,168 @@
+---
+id: overview
+title: Self-host overview
+sidebar_position: 1
+---
+
+# Self-host overview
+
+Cairn is built to be self-hosted. A production deployment is:
+
+- **cairn-core** — one distroless container. It serves the Connect-RPC + REST
+  API and the embedded SvelteKit web UI, runs migrations, and is the server
+  side of the NATS control plane.
+- **Postgres 17** with **TimescaleDB** (streams) and **PostGIS** (segments).
+- **NATS + JetStream** — the worker control plane and async job/result bus.
+- **An S3-compatible object store** (MinIO, Garage, AWS S3, …) for raw blobs
+  and photos. Optional — core runs without it, you just lose blob upload.
+- **Provider workers** — one container per provider you use
+  (`cairn-provider-strava`, `cairn-provider-garmin`), each a separate process.
+
+```
+                +-------------------+
+   web UI  ───▶ |     cairn-core    | ──▶ Postgres (Timescale + PostGIS)
+   API     ───▶ |  (API + web UI)   | ──▶ S3 (blobs, photos)
+                +---------+---------+
+                          │ NATS + JetStream (jobs / results / tokens)
+              ┌───────────┴───────────┐
+              ▼                       ▼
+      cairn-provider-strava     cairn-provider-garmin
+```
+
+## Choose a path
+
+- [Docker Compose](#docker-compose) — simplest single-host deployment.
+- [Kubernetes](/self-host/kubernetes) — manifests for a cluster.
+- [Configuration](/self-host/configuration) — environment variables.
+- [Providers](/self-host/providers) — wiring Strava and Garmin.
+
+## Docker Compose
+
+Pull the published images and run them together. Core embeds the web UI, so
+there is nothing else to serve.
+
+```yaml title="docker-compose.yml (sketch)"
+services:
+  core:
+    image: ghcr.io/opencairn-org/cairn-core:v0.4.0
+    env_file: .env
+    ports: ["8080:8080"]
+    depends_on: [postgres, nats]
+  worker-strava:
+    image: ghcr.io/opencairn-org/cairn-provider-strava:v0.4.0
+    env_file: .env
+    # one enrollment per worker, only with NATS auth-callout
+    environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${STRAVA_ENROLLMENT_TOKEN:-}" }
+  worker-garmin:
+    image: ghcr.io/opencairn-org/cairn-provider-garmin:v0.4.0
+    env_file: .env
+    environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${GARMIN_ENROLLMENT_TOKEN:-}" }
+    volumes: ["garmin-tokens:/data"]
+  postgres:
+    image: timescale/timescaledb-ha:pg17-ts2.27
+  nats: { image: nats:2.15.1-alpine, command: ["-js"] }
+  minio: { image: minio/minio, command: ["server", "/data"] }
+volumes:
+  garmin-tokens:
+```
+
+Pin the image tags to a release rather than `latest`, and upgrade core and the
+workers together; this page documents core v0.4.0 with the Strava worker
+v0.4.0 and the Garmin worker v0.4.0.
+
+The Garmin worker runs as the unprivileged user `cairn` (uid/gid 10001) and
+keeps its Garmin token cache under `/data`. A new named volume is created with
+the right owner. A volume or bind mount written by an older image (which ran as
+root) has to be handed over once, otherwise the cached tokens cannot be read:
+
+```bash
+docker run --rm -v garmin-tokens:/data alpine chown -R 10001:10001 /data
+```
+
+Put a TLS-terminating reverse proxy (Caddy, nginx, Traefik) in front of core,
+and set `CAIRN_INSTANCE_TRUSTED_PROXIES` to its address so client IPs are read
+from the forwarded headers. See [Configuration](/self-host/configuration) for
+the full variable list — in particular the three required secrets and the map
+tile settings if you would rather not hit the public OpenStreetMap tile server
+from your instance.
+
+## Upgrading to 0.5.0
+
+- **Core first, then both workers to 0.5.0.** Jobs, results and the account
+  lookup moved to per-pool subjects (`cairn.jobs.<job>.<provider>.<worker_name>`,
+  see [Provider contract](/architecture/provider-contract)); a 0.4 worker
+  keeps running against core 0.5 but receives no new jobs. Jobs queued before
+  the upgrade are drained by the 0.5 workers.
+- Migrations 00064–00066 add the parser/release stamps on sources, one
+  connection per worker pool per provider account, and the `worker_pools`
+  registry (filled from existing sources). Existing connections are assigned
+  to their pool automatically when the provider has one.
+- Every source imported before 0.5.0 is flagged "newer parser available";
+  use **Re-parse N out of date** on Connections to bring them up to date
+  without provider quota. Garmin activities need a re-fetch to pick up gear:
+  their archives have none.
+- Rate budgets are now per provider app and shown per connection.
+- Core publishes its release to the `cairn_core` KV bucket and workers refuse
+  an incompatible one. Before 1.0 the minor must match; from 1.0 on, minor and
+  patch releases of core stay compatible with older workers.
+
+## Upgrading to 0.4.0
+
+- **Core first, then the workers.** Core 0.4.0 ignores unknown fields in job
+  results; a 0.4.0 worker talking to a 0.3.x core would fail every import.
+  Core 0.4.0 with 0.3.x workers is fine (no gear, nothing else changes).
+- Migration 00063 adds gear tables and `activities.gear_set_by`; gear that
+  was attached before (through the API) is kept and marked as set by the
+  user.
+- Gear from connected accounts arrives on the next reconcile or "Sync gear"
+  as pending records; users decide per record whether it is new gear or an
+  alias (see [Gear](/using-cairn/gear)). Strava activities imported before
+  0.4.0 get their gear after a reparse, Garmin activities after a reimport.
+- The Garmin worker makes one extra call per fetched activity for its gear;
+  set `CAIRN_GARMIN_FETCH_ACTIVITY_GEAR=false` to keep the old call count.
+
+## Upgrading to 0.3.3
+
+- The project moved to the `opencairn-org` GitHub organization. Pull the
+  images from `ghcr.io/opencairn-org/` (`cairn-core`, `cairn-provider-strava`,
+  `cairn-provider-garmin`); the `ghcr.io/johnnycube/` namespace keeps the tags
+  published so far as a frozen mirror and receives no new versions. Update
+  image pins and Renovate rules; nothing else to migrate.
+
+## Upgrading to 0.3.2
+
+- Worker enrollments accept any well-formed provider type (1–48 of
+  `[a-z0-9_-]`), not only `strava` and `garmin`; the admin UI suggests the
+  built-in ones. Nothing to migrate. Account linking for a new provider still
+  needs core support (see [Other providers](/self-host/providers#other-providers)).
+
+## Upgrading to 0.3.1
+
+- Creating a worker enrollment requires a `provider`. Enrollments made
+  before 0.3.1 have none; core refuses them at connect and the admin list
+  marks them **re-enroll required**. Create new ones (see
+  [Providers](/self-host/providers#re-enroll-required)).
+- Core answers NATS auth-callout requests only with
+  `CAIRN_NATS_AUTH_CALLOUT=true` and `CAIRN_NATS_WORKER_ACCOUNT` set; follow
+  the [auth-callout setup](/self-host/providers#nats-auth-callout). Without
+  NATS auth nothing changes.
+- With the auth-callout, run Strava v0.3.1 and Garmin v0.3.1: both enroll
+  with `CAIRN_WORKER_ENROLLMENT_TOKEN` alone. The placeholder nkey user in
+  nats.conf is only needed for Strava v0.3.0 and earlier, and the Garmin
+  worker no longer needs a static NATS user.
+
+## Upgrading to 0.3.0
+
+- Configuration is read only from `CAIRN_`-prefixed variables. Unprefixed
+  host variables (`URL`, `USERNAME`, `PASSWORD`, `SESSION_SECRET`, …) no
+  longer fill Cairn settings; rename any you relied on.
+- An empty `CAIRN_DATABASE_URL`, `CAIRN_AUTH_SESSION_SECRET` or
+  `CAIRN_AUTH_MASTER_ENCRYPTION_KEY` now fails startup. Run
+  `cairn config help` to see every variable with its default.
+- Under NATS auth, upgrade core first: the worker permission template that
+  auth-callout grants now matches the job subjects and JetStream API calls the
+  workers make (see [Providers](/self-host/providers#nats-permissions)).
+  Workers under NATS without auth are unaffected.
+- The Garmin worker image no longer runs as root; see the volume note above.
+- Connect-RPC requests are capped at 4 MiB per message and upload bodies are
+  capped (see [Request limits](/self-host/configuration#request-limits)).

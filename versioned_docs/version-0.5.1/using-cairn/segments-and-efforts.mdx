@@ -1,0 +1,25 @@
+---
+id: segments-and-efforts
+title: Segments & best-efforts
+sidebar_position: 5
+---
+
+# Segments & best-efforts
+
+## Segments
+
+Cairn matches your activities against segments using PostGIS. Each matched
+effort is timed and ranked, producing leaderboards (KOM/QOM-style) across the
+users on your instance. Segment definitions imported from providers (e.g.
+Strava segment efforts reference their segments) are first-class entities.
+
+## Best-efforts
+
+For supported activity types, Cairn automatically detects best efforts over
+standard distances/durations from your stream data, and tracks **personal
+records**. New PRs trigger notifications as part of the import follow-ups.
+
+Browse them under **Best-efforts** and **Records** in the web UI, or read
+them from the API: `GET /api/records`, `GET /api/best-efforts/history`,
+`GET /api/segments`, `GET /api/segments/{id}` and
+`GET /api/activities/{id}/segment-efforts`.

@@ -101,21 +101,34 @@ manage-view liveness.
 
 ## 3. Job consumption — MUST
 
+Jobs are routed to **pools** (from 0.5.0): every instance with the same
+`worker_name` for a provider is one pool, and core publishes each job to one
+pool on `cairn.jobs.<job>.<provider>.<worker_name>`. An external account is
+assigned to one pool; its imports, re-fetches, gear and metrics jobs go there.
+Re-parse goes to a pool of the source's own package. Several pools (e.g. an
+API importer and a file importer) can serve one provider side by side.
+
 Create a **durable pull consumer** on `CAIRN_JOBS` for **every** job subject
-of your provider that core publishes. Filter each consumer on the exact
-subject: core publishes `cairn.jobs.fetch_source.<provider>` with nothing
-after the provider, so a `cairn.jobs.fetch_source.<provider>.>` filter matches
-nothing, and the permission template only allows filtered consumer creation
-to the subjects below:
+of your pool, filtered on the exact subject. `CAIRN_JOBS` is a work queue: it
+refuses two consumers with the same filter, so instances of one pool share one
+durable per subject. The permission template only allows filtered consumer
+creation to these subjects:
 
 | Subject | Required | Purpose |
 |---|---|---|
-| `cairn.jobs.fetch_source.<provider>` | MUST | import one activity |
-| `cairn.jobs.reconcile.<provider>` | MUST | catch new activity since watermark |
-| `cairn.jobs.parse_blob.<provider>` | MUST if raw blobs are archived | quota-free re-parse |
-| `cairn.jobs.import_metrics.<provider>` | MUST if manifest declares METRIC events | health metrics |
-| `cairn.jobs.import_gear.<provider>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
-| `cairn.jobs.backfill.<provider>` | MAY | legacy full-history walk |
+| `cairn.jobs.fetch_source.<provider>.<worker_name>` | MUST | import one activity |
+| `cairn.jobs.reconcile.<provider>.<worker_name>` | MUST | catch new activity since watermark |
+| `cairn.jobs.parse_blob.<provider>.<worker_name>` | MUST if raw blobs are archived | quota-free re-parse |
+| `cairn.jobs.import_metrics.<provider>.<worker_name>` | MUST if manifest declares METRIC events | health metrics |
+| `cairn.jobs.import_gear.<provider>.<worker_name>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
+| `cairn.jobs.backfill.<provider>.<worker_name>` | MAY | legacy full-history walk |
+
+The 0.4 subjects without `<worker_name>` stay subscribable through 0.5 so an
+upgraded worker drains jobs queued before the upgrade (reuse the old durable
+name; a work queue lets only one pool drain them). They are removed in 0.6.
+Workers publish their own `fetch_source` sub-jobs (reconcile, webhooks) to
+their own pool subject. Results stay provider-scoped:
+`cairn.results.<job>.<provider>`.
 
 :::warning Why "every subject" is a MUST
 `CAIRN_JOBS` is a work-queue stream — messages for a subject nobody consumes
@@ -258,8 +271,9 @@ item sits `in_progress` until the stale reaper masks the cause as
 
 ## 8. Discover — MUST
 
-Subscribe to and respond on plain request/reply `cairn.discover.<provider>`
-(the template allows subscribing to it):
+Subscribe to and respond on plain request/reply
+`cairn.discover.<provider>.<worker_name>` (the template allows subscribing to
+it); core asks the account's pool:
 
 Request: `{"account_id": "…", "start_page": 1}`
 Reply: `{"items": [{"item_type": "activity", "external_id": "…",

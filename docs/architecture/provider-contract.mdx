@@ -40,11 +40,46 @@ subjects on the `CAIRN_RESULTS` interest stream — see
   buckets. The full list is on
   [Self-host → Providers](/self-host/providers#nats-permissions). Anything
   else is refused with `Permissions Violation`.
-- Identity triple: **provider** (e.g. `garmin`), **package** (stable build
-  identity, e.g. `cairn.workers.garmin`), **version** (incrementing integer).
-  Together they form core's update-available / re-parse-eligibility key.
-  Every published `JobResult` MUST carry `worker_name`, `worker_version`,
+- Identity: **provider** (e.g. `garmin`), **package** (stable build
+  identity, e.g. `cairn.workers.garmin`) and the parser version (see
+  [Versioning](#versioning)). Every published `JobResult` MUST carry
+  `worker_name`, `worker_version` (the parser version `N.M`) and
   `worker_package`.
+
+### Versioning
+
+A worker carries three independent versions (from 0.5.0):
+
+| Version | Form | Meaning | Bumped when |
+| --- | --- | --- | --- |
+| Release | `v0.5.1` | the core contract the worker implements | every release; major.minor follows core |
+| Dataset | `N` | format of the archived raw blob (`version` in the archive envelope) | a parser can no longer read the previous format |
+| Parser | `N.M` | parser for dataset `N`, output revision `M` | every change to the parsed output |
+
+- **Release compatibility:** a worker is compatible with core when both
+  releases share major and minor (`v0.5.3` worker with `v0.5.0` core).
+  Patch levels are free. Dev builds are exempt.
+- **Parser `N.x` MUST read every dataset `N` archive**, including archives
+  written by older importers; fields missing from them are absent, not an
+  error. It does not read other dataset versions.
+- **Bump `M` on any change to the parsed output** (new field, fixed mapping,
+  changed unit). A refactor with byte-identical output does not bump it. A
+  new dataset version resets `M`: `1.4` → `2.0`.
+- **Forward only.** A source parsed by `N.M` is only re-parsed or re-fetched
+  by a parser `>= N.M`. Core rejects results that would lower a source's
+  version; a worker given a `parse_blob` job with a higher
+  `min_parser_version` than its own MUST NAK it so a newer pooled instance
+  takes it.
+- A legacy bare integer `N` reads as `N.0`.
+
+What core offers per source, given the live workers:
+
+| Live worker vs. source | Offered |
+| --- | --- |
+| same `N.M` | re-parse (re-run) |
+| same `N`, higher `M` | re-parse from archive (no provider quota) |
+| higher `N` | re-fetch from provider |
+| older | nothing — would downgrade |
 
 ## 2. Presence heartbeat — MUST
 
@@ -53,7 +88,7 @@ Write a JSON presence record to the `cairn_worker_presence` KV bucket every
 
 ```json
 {"worker_name": "...", "worker_key": "...", "instance_id": "...",
- "version": "...", "provider": "...", "package": "...",
+ "version": "<parser N.M>", "release": "<vX.Y.Z>", "provider": "...", "package": "...",
  "webhooks": false, "capabilities": {...}, "last_seen": "<RFC3339>"}
 ```
 
@@ -128,6 +163,8 @@ declares `Gear` in its manifest.
 
 `parse_blob`: as `fetch_source` plus
 `"blob": {"url": "<presigned GET>", "expires_at": "…", "fallback_handle": "<blob key>"}`
+and `"min_parser_version": "N.M"` (the source's current parser version; NAK
+when yours is lower or reads another dataset)
 — on an expired URL, re-presign via `cairn.blobs.presign_download.<provider>`
 with the fallback handle.
 

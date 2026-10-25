@@ -1,0 +1,73 @@
+---
+id: gear
+title: Gear
+sidebar_position: 4
+---
+
+# Gear
+
+Gear is the bikes and shoes you ride and run in. Since 0.4.0 it is a real
+entity: you manage it on the **Gear** page, your providers' gear is mapped onto
+it, activities get their gear automatically, and every piece of gear shows its
+distance, moving time and activity count.
+
+## Your gear is the golden record
+
+Cairn keeps **one record per physical bike or pair of shoes**, yours. A
+provider's record of the same bike (Strava's "Canyon", Garmin's "Grail") is a
+*provider record* mapped onto it: one gear can carry several provider records,
+one per connected account. That is what makes "bike A on Strava is bike B on
+Garmin" a single bike in Cairn.
+
+Provider records are never turned into gear on their own. When a connected
+account reports gear Cairn has not seen, the record stays **pending** and you
+get a *Gear needs a decision* notification. On the Gear page you choose:
+
+- **Create gear** — new gear from the provider's description (name, brand,
+  model, retired state, defaults).
+- **Map** — the record is an alias of gear you already have.
+- **Decide later** — nothing changes; the record stays pending.
+
+A mapping can be corrected later by mapping the record onto other gear.
+Nothing a provider sends ever overwrites a name, brand or model you edited; a
+retirement on the provider side is followed.
+
+## How an activity gets its gear
+
+- **Imported activities** take the gear recorded by the winning source. Each
+  source carries its provider's gear id; Cairn resolves it through the
+  provider records to your gear and applies your merge policy's priority for
+  the field group `gear`. Like any field group it can be pinned to one source.
+  A source whose record is still pending does not count until you decide.
+- **Manual and uploaded activities** get your **default per sport**, once,
+  when they are created. Changing a default later does not rewrite history.
+- **Your choice wins.** Pick gear on the activity edit page (including *no
+  gear*) and it stays, whatever later imports say. The activity page shows
+  whether gear was *set by you* or came *from source*; **Reset to automatic**
+  hands it back to the merge.
+
+## The Gear page
+
+- Active gear with totals (distance, moving time, activity count; a click
+  lists those activities), provider badges, and the sports it is the default
+  for.
+- Create, edit, **retire** (keeps history, hides it from pickers), bring back,
+  and **delete** (its activities keep no gear, and are re-derived from their
+  sources).
+- **This is the same as…** merges two records: provider records, defaults and
+  activities move to the one you keep. Not reversible.
+- **Defaults per sport** for manual and uploaded activities.
+- Pending provider records with the three choices above.
+
+Totals count every live activity attached to the gear, using the activity's
+corrected distance and moving time where you overrode them.
+
+## Syncing provider gear
+
+Gear lists are fetched from each account on connect, with every scheduled
+reconcile, and on **Sync gear** on the Connections page. Workers that do not
+import gear say so there.
+
+Activities imported before 0.4.0: Strava sources carry the gear in their
+archived data, so a **reparse** (Manage → sources) attaches it without API
+calls; Garmin sources need a **reimport**.

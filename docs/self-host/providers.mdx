@@ -59,8 +59,10 @@ it has lapsed. Both take an optional JSON body: `{"reason": "..."}` for revoke,
 A worker for a provider core does not ship (say `polar`) is enrolled the same
 way: the admin creates an enrollment with `"provider": "polar"` and hands the
 worker its name and token. It is admitted and scoped to the `polar` subjects
-only (`cairn.jobs.*.polar`, `cairn.tokens.polar.>`, …), never another
-provider's. Linking user accounts for a new provider still needs core
+only (`cairn.jobs.*.polar.<name>`, `cairn.tokens.polar.>`, …), never another
+provider's or another pool's. Several workers with different names can serve
+one provider; each connection is then assigned to one of them on the
+Connections page. Linking user accounts for a new provider still needs core
 support: OAuth connect and job dispatch use core's built-in provider list.
 
 ### Re-enroll required

@@ -56,9 +56,13 @@ A worker carries three independent versions (from 0.5.0):
 | Dataset | `N` | format of the archived raw blob (`version` in the archive envelope) | a parser can no longer read the previous format |
 | Parser | `N.M` | parser for dataset `N`, output revision `M` | every change to the parsed output |
 
-- **Release compatibility:** a worker is compatible with core when both
-  releases share major and minor (`v0.5.3` worker with `v0.5.0` core).
-  Patch levels are free. Dev builds are exempt.
+- **Release compatibility:** before 1.0 a worker is compatible with core when
+  both releases share major and minor (`v0.5.3` worker with `v0.5.0` core);
+  patch levels are free. From 1.0 on, minor and patch releases are backwards
+  compatible: same major, and the worker's minor not above core's (`v1.1.4`
+  worker with `v1.3.0` core works; `v1.4.0` with `v1.3.0` does not). Core
+  publishes its release under `info` in the `cairn_core` KV bucket; a worker
+  MUST refuse to run against an incompatible core. Dev builds are exempt.
 - **Parser `N.x` MUST read every dataset `N` archive**, including archives
   written by older importers; fields missing from them are absent, not an
   error. It does not read other dataset versions.
@@ -108,9 +112,11 @@ assigned to one pool; its imports, re-fetches, gear and metrics jobs go there.
 Re-parse goes to a pool of the source's own package. Several pools (e.g. an
 API importer and a file importer) can serve one provider side by side: the
 user connects the same provider account once per pool they want, each
-connection with its own sync state, tokens and queue. Core groups the
-resulting sources into one activity and merges them by its priority list,
-where `<provider>.<worker_name>` names one pool.
+connection with its own sync state, tokens, queue and rate-limit budget. Core
+groups the resulting sources into one activity and merges them by its priority
+list, where `<provider>.<worker_name>` names one pool. A pool name is
+permanent: core binds it to the first package it reports and refuses another
+package under that name, so a different implementation needs a new name.
 
 Create a **durable pull consumer** on `CAIRN_JOBS` for **every** job subject
 of your pool, filtered on the exact subject. `CAIRN_JOBS` is a work queue: it
@@ -192,7 +198,10 @@ with the fallback handle.
 ## 5. Results — claim-check — MUST
 
 Results are protojson `JobResult` published to
-`cairn.results.<job_type>.<provider>`.
+`cairn.results.<job_type>.<provider>.<worker_name>` (reconcile appends the
+account id). Core checks that `worker_name` in the result equals the pool
+token of the subject and that the name's package never changes; the pre-0.5
+`cairn.results.<job_type>.<provider>` form is still accepted through 0.5.
 
 **Event-carrying results MUST be claim-checked** (streams routinely exceed
 the broker's `max_payload`; inline oversized publishes used to Term and wedge
@@ -302,18 +311,19 @@ error or rate limit — the UI would show "0 importable activities".
 ## 9a. Account lookup (webhooks)
 
 A webhook event names the provider's owner id, not a Cairn account. Resolve it
-with request/reply on `cairn.accounts.lookup_by_provider_ext`:
+with request/reply on your pool's subject
+`cairn.accounts.lookup.<provider>.<worker_name>`:
 
 ```json
-{"provider": "strava", "external_id": "<owner id>", "subscription_id": "<optional>",
- "worker_name": "<your pool>"}
+{"external_id": "<owner id>", "subscription_id": "<optional>"}
 ```
 
 Reply: `{"account_id": "…", "user_id": "…"}` or `{"error": "not_found" |
-"auto_import_suspended" | …}`. `subscription_id` is preferred when known.
-`worker_name` MUST be sent (from 0.5.0): the same provider account may be
-connected once per pool, and core returns the connection of the asking pool
-(a connection without a pool matches any).
+"auto_import_suspended" | …}`. `subscription_id` is preferred when known. The
+same provider account may be connected once per pool; core returns the
+connection of the pool named in the subject (a connection without a pool
+matches any). The pre-0.5 `cairn.accounts.lookup_by_provider_ext` (with
+`provider` and `worker_name` in the body) is still served through 0.5.
 
 ## 10. Conformance harness
 

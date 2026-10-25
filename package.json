@@ -17,7 +17,7 @@
     "lint": "prettier --check . && eslint --max-warnings=0 .",
     "test": "docusaurus build",
     "cover": "echo \"no coverage gate: the site has no unit-tested code; test builds every page\"",
-    "audit": "audit-ci --config audit-ci.jsonc && license-checker-rseidelsohn --production --excludePrivatePackages --summary --onlyAllow \"MIT;MIT-0;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;BlueOak-1.0.0;MPL-2.0;EPL-2.0;Python-2.0;CC-BY-4.0\" && knip --dependencies && gitleaks git --no-banner --redact .",
+    "audit": "audit-ci --config audit-ci.jsonc && license-checker-rseidelsohn --production --excludePrivatePackages --summary --onlyAllow \"MIT;MIT-0;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;BlueOak-1.0.0;MPL-2.0;EPL-2.0;Python-2.0;CC-BY-4.0;Unlicense\" && knip --dependencies && gitleaks git --no-banner --redact .",
     "check-fast": "npm run lint",
     "check": "npm run lint && npm run test && npm run audit && fleetlint check --fail-on error"
   },

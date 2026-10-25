@@ -135,9 +135,10 @@ creation to these subjects:
 | `cairn.jobs.import_gear.<provider>.<worker_name>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
 | `cairn.jobs.backfill.<provider>.<worker_name>` | MAY | legacy full-history walk |
 
-The 0.4 subjects without `<worker_name>` stay subscribable through 0.5 so an
-upgraded worker drains jobs queued before the upgrade (reuse the old durable
-name; a work queue lets only one pool drain them). They are removed in 0.6.
+The 0.4 job subjects without `<worker_name>` stay subscribable through 0.5 so
+an upgraded worker drains jobs queued before the upgrade (reuse the old
+durable name; a work queue lets only one pool drain them). They are removed in
+0.6. Results and lookups are pool-scoped only.
 Workers publish their own `fetch_source` sub-jobs (reconcile, webhooks) to
 their own pool subject. Results stay provider-scoped:
 `cairn.results.<job>.<provider>`.
@@ -202,8 +203,10 @@ with the fallback handle.
 Results are protojson `JobResult` published to
 `cairn.results.<job_type>.<provider>.<worker_name>` (reconcile appends the
 account id). Core checks that `worker_name` in the result equals the pool
-token of the subject and that the name's package never changes; the pre-0.5
-`cairn.results.<job_type>.<provider>` form is still accepted through 0.5.
+token of the subject, that the name's package never changes, and that an
+activity result comes from the account's pool (`fetch_source`) or from the
+package that imported the source (`parse_blob`). The pre-0.5
+`cairn.results.<job_type>.<provider>` form is no longer granted to workers.
 
 **Event-carrying results MUST be claim-checked** (streams routinely exceed
 the broker's `max_payload`; inline oversized publishes used to Term and wedge
@@ -324,8 +327,8 @@ Reply: `{"account_id": "…", "user_id": "…"}` or `{"error": "not_found" |
 "auto_import_suspended" | …}`. `subscription_id` is preferred when known. The
 same provider account may be connected once per pool; core returns the
 connection of the pool named in the subject (a connection without a pool
-matches any). The pre-0.5 `cairn.accounts.lookup_by_provider_ext` (with
-`provider` and `worker_name` in the body) is still served through 0.5.
+matches any). The pre-0.5 `cairn.accounts.lookup_by_provider_ext` is no
+longer granted to workers.
 
 ## 10. Conformance harness
 

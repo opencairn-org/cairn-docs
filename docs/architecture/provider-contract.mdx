@@ -40,11 +40,54 @@ subjects on the `CAIRN_RESULTS` interest stream — see
   buckets. The full list is on
   [Self-host → Providers](/self-host/providers#nats-permissions). Anything
   else is refused with `Permissions Violation`.
-- Identity triple: **provider** (e.g. `garmin`), **package** (stable build
-  identity, e.g. `cairn.workers.garmin`), **version** (incrementing integer).
-  Together they form core's update-available / re-parse-eligibility key.
-  Every published `JobResult` MUST carry `worker_name`, `worker_version`,
+- Identity: **provider** (e.g. `garmin`), **package** (stable build
+  identity, e.g. `cairn.workers.garmin`) and the parser version (see
+  [Versioning](#versioning)). Every published `JobResult` MUST carry
+  `worker_name`, `worker_version` (the parser version `N.M`) and
   `worker_package`.
+
+### Versioning
+
+A worker carries three independent versions (from 0.5.0):
+
+| Version | Form | Meaning | Bumped when |
+| --- | --- | --- | --- |
+| Release | `v0.5.1` | the core contract the worker implements | every release; major.minor follows core |
+| Dataset | `N` | format of the archived raw blob (`version` in the archive envelope) | a parser can no longer read the previous format |
+| Parser | `N.M` | parser for dataset `N`, output revision `M` | every change to the parsed output |
+
+- **Release compatibility:** before 1.0 a worker is compatible with core when
+  both releases share major and minor (`v0.5.3` worker with `v0.5.0` core);
+  patch levels are free. From 1.0 on, minor and patch releases are backwards
+  compatible: same major, and the worker's minor not above core's (`v1.1.4`
+  worker with `v1.3.0` core works; `v1.4.0` with `v1.3.0` does not). Core
+  publishes its release under `info` in the `cairn_core` KV bucket; a worker
+  MUST refuse to run against an incompatible core. Dev builds are exempt.
+- **Parser `N.x` MUST read every dataset `N` archive**, including archives
+  written by older importers; fields missing from them are absent, not an
+  error. It does not read other dataset versions.
+- **Bump `M` on any change to the parsed output** (new field, fixed mapping,
+  changed unit). A refactor with byte-identical output does not bump it. A
+  new dataset version resets `M`: `1.4` → `2.0`.
+- **Forward only.** A source parsed by `N.M` is only re-parsed or re-fetched
+  by a parser `>= N.M`. Core rejects results that would lower a source's
+  version; a worker given a `parse_blob` job with a higher
+  `min_parser_version` than its own MUST NAK it so a newer pooled instance
+  takes it.
+- A legacy bare integer `N` reads as `N.0`.
+- **The archive MUST hold every input the parser uses**, so a re-parse
+  reproduces the import. A parser change needing a new input (e.g. a
+  separate gear call) first archives it — additive, still dataset `N`;
+  older archives lack it and need one re-fetch.
+
+What core offers per source, given the live workers:
+
+| Live worker vs. source | Offered |
+| --- | --- |
+| same `N.M` | re-parse (re-run) |
+| same `N`, higher `M` | re-parse from archive (no provider quota) |
+| higher `N` | re-fetch from provider |
+| older | nothing — would downgrade |
 
 ## 2. Presence heartbeat — MUST
 
@@ -53,7 +96,7 @@ Write a JSON presence record to the `cairn_worker_presence` KV bucket every
 
 ```json
 {"worker_name": "...", "worker_key": "...", "instance_id": "...",
- "version": "...", "provider": "...", "package": "...",
+ "version": "<parser N.M>", "release": "<vX.Y.Z>", "provider": "...", "package": "...",
  "webhooks": false, "capabilities": {...}, "last_seen": "<RFC3339>"}
 ```
 
@@ -62,21 +105,47 @@ manage-view liveness.
 
 ## 3. Job consumption — MUST
 
+Jobs are routed to **pools** (from 0.5.0): every instance with the same
+`worker_name` for a provider is one pool, and core publishes each job to one
+pool on `cairn.jobs.<job>.<provider>.<worker_name>`. An external account is
+assigned to one pool; its imports, re-fetches, gear and metrics jobs go there.
+Re-parse goes to a pool of the source's own package. Several pools (e.g. an
+API importer and a file importer) can serve one provider side by side: the
+user connects the same provider account once per pool they want, each
+connection with its own sync state, tokens and queue. Rate-limit budgets are
+per provider app: the token reply carries `app_id` (a hash of the
+connection's client id), and the worker keys its buckets
+`<provider>:<app_id>:<window>` (stored as `<provider>.<app_id>.<window>` in
+the `cairn_rate_limits` KV). A token without `app_id` (older core) uses the
+pool's bucket `<provider>:<worker_name>:<window>`. Connections of one provider
+account on different pools MUST use different apps. Core
+groups the resulting sources into one activity and merges them by its priority
+list, where `<provider>.<worker_name>` names one pool. A pool name is
+permanent: core binds it to the first package it reports and refuses another
+package under that name, so a different implementation needs a new name.
+
 Create a **durable pull consumer** on `CAIRN_JOBS` for **every** job subject
-of your provider that core publishes. Filter each consumer on the exact
-subject: core publishes `cairn.jobs.fetch_source.<provider>` with nothing
-after the provider, so a `cairn.jobs.fetch_source.<provider>.>` filter matches
-nothing, and the permission template only allows filtered consumer creation
-to the subjects below:
+of your pool, filtered on the exact subject. `CAIRN_JOBS` is a work queue: it
+refuses two consumers with the same filter, so instances of one pool share one
+durable per subject. The permission template only allows filtered consumer
+creation to these subjects:
 
 | Subject | Required | Purpose |
 |---|---|---|
-| `cairn.jobs.fetch_source.<provider>` | MUST | import one activity |
-| `cairn.jobs.reconcile.<provider>` | MUST | catch new activity since watermark |
-| `cairn.jobs.parse_blob.<provider>` | MUST if raw blobs are archived | quota-free re-parse |
-| `cairn.jobs.import_metrics.<provider>` | MUST if manifest declares METRIC events | health metrics |
-| `cairn.jobs.import_gear.<provider>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
-| `cairn.jobs.backfill.<provider>` | MAY | legacy full-history walk |
+| `cairn.jobs.fetch_source.<provider>.<worker_name>` | MUST | import one activity |
+| `cairn.jobs.reconcile.<provider>.<worker_name>` | MUST | catch new activity since watermark |
+| `cairn.jobs.parse_blob.<provider>.<worker_name>` | MUST if raw blobs are archived | quota-free re-parse |
+| `cairn.jobs.import_metrics.<provider>.<worker_name>` | MUST if manifest declares METRIC events | health metrics |
+| `cairn.jobs.import_gear.<provider>.<worker_name>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
+| `cairn.jobs.backfill.<provider>.<worker_name>` | MAY | legacy full-history walk |
+
+The 0.4 job subjects without `<worker_name>` stay subscribable through 0.5 so
+an upgraded worker drains jobs queued before the upgrade (reuse the old
+durable name; a work queue lets only one pool drain them). They are removed in
+0.6. Results and lookups are pool-scoped only.
+Workers publish their own `fetch_source` sub-jobs (reconcile, webhooks) to
+their own pool subject. Results stay provider-scoped:
+`cairn.results.<job>.<provider>`.
 
 :::warning Why "every subject" is a MUST
 `CAIRN_JOBS` is a work-queue stream — messages for a subject nobody consumes
@@ -128,13 +197,20 @@ declares `Gear` in its manifest.
 
 `parse_blob`: as `fetch_source` plus
 `"blob": {"url": "<presigned GET>", "expires_at": "…", "fallback_handle": "<blob key>"}`
+and `"min_parser_version": "N.M"` (the source's current parser version; NAK
+when yours is lower or reads another dataset)
 — on an expired URL, re-presign via `cairn.blobs.presign_download.<provider>`
 with the fallback handle.
 
 ## 5. Results — claim-check — MUST
 
 Results are protojson `JobResult` published to
-`cairn.results.<job_type>.<provider>`.
+`cairn.results.<job_type>.<provider>.<worker_name>` (reconcile appends the
+account id). Core checks that `worker_name` in the result equals the pool
+token of the subject, that the name's package never changes, and that an
+activity result comes from the account's pool (`fetch_source`) or from the
+package that imported the source (`parse_blob`). The pre-0.5
+`cairn.results.<job_type>.<provider>` form is no longer granted to workers.
 
 **Event-carrying results MUST be claim-checked** (streams routinely exceed
 the broker's `max_payload`; inline oversized publishes used to Term and wedge
@@ -217,8 +293,9 @@ item sits `in_progress` until the stale reaper masks the cause as
 
 ## 8. Discover — MUST
 
-Subscribe to and respond on plain request/reply `cairn.discover.<provider>`
-(the template allows subscribing to it):
+Subscribe to and respond on plain request/reply
+`cairn.discover.<provider>.<worker_name>` (the template allows subscribing to
+it); core asks the account's pool:
 
 Request: `{"account_id": "…", "start_page": 1}`
 Reply: `{"items": [{"item_type": "activity", "external_id": "…",
@@ -239,6 +316,23 @@ error or rate limit — the UI would show "0 importable activities".
   (`cairn_rate_limits`) before each API call, sync the limiter from the
   provider's usage headers on every response, anchor 429 backoff to the real
   window reset, and report `RateLimitSnapshot`s opportunistically.
+
+## 9a. Account lookup (webhooks)
+
+A webhook event names the provider's owner id, not a Cairn account. Resolve it
+with request/reply on your pool's subject
+`cairn.accounts.lookup.<provider>.<worker_name>`:
+
+```json
+{"external_id": "<owner id>", "subscription_id": "<optional>"}
+```
+
+Reply: `{"account_id": "…", "user_id": "…"}` or `{"error": "not_found" |
+"auto_import_suspended" | …}`. `subscription_id` is preferred when known. The
+same provider account may be connected once per pool; core returns the
+connection of the pool named in the subject (a connection without a pool
+matches any). The pre-0.5 `cairn.accounts.lookup_by_provider_ext` is no
+longer granted to workers.
 
 ## 10. Conformance harness
 

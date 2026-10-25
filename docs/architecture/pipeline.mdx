@@ -25,19 +25,20 @@ new follow-up stage must hold to this pattern.
 
 ## Async via NATS
 
-Workers and core communicate over NATS. Subjects are
-`cairn.<kind>.<job_type>.<provider>`, with the provider as the last token:
+Workers and core communicate over NATS. Jobs are addressed to a worker pool
+(every instance with one `worker_name`), results to the provider:
 
-- `cairn.jobs.<type>.<provider>` — work for a provider on the `CAIRN_JOBS`
-  work-queue stream: `fetch_source`, `reconcile`, `parse_blob`,
-  `import_metrics`, `backfill`. The subject is exact, e.g.
-  `cairn.jobs.fetch_source.strava`; workers also publish `fetch_source`
-  sub-jobs here from reconcile and webhooks.
+- `cairn.jobs.<type>.<provider>.<worker_name>` — work for one pool on the
+  `CAIRN_JOBS` work-queue stream: `fetch_source`, `reconcile`, `parse_blob`,
+  `import_metrics`, `import_gear`, `backfill`, e.g.
+  `cairn.jobs.fetch_source.strava.strava-fetcher`. Core sends an account's
+  jobs to the pool the account is assigned to; workers publish `fetch_source`
+  sub-jobs from reconcile and webhooks to their own pool.
 - `cairn.results.<type>.<provider>` — `JobResult` events back to core on the
   `CAIRN_RESULTS` stream; reconcile results are account-suffixed,
   `cairn.results.reconcile.<provider>.<external_account_id>`.
-- `cairn.discover.<provider>` — request/reply listing of importable items,
-  served by the worker.
+- `cairn.discover.<provider>.<worker_name>` — request/reply listing of
+  importable items, served by the pool.
 - `cairn.tokens.<provider>.*` / `cairn.creds.<provider>.get` — token and
   credential exchange (request/reply, served by core).
 - `cairn.blobs.presign_upload.<provider>` / `..presign_download.<provider>` —

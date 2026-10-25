@@ -112,7 +112,9 @@ assigned to one pool; its imports, re-fetches, gear and metrics jobs go there.
 Re-parse goes to a pool of the source's own package. Several pools (e.g. an
 API importer and a file importer) can serve one provider side by side: the
 user connects the same provider account once per pool they want, each
-connection with its own sync state, tokens, queue and rate-limit budget. Core
+connection with its own sync state, tokens, queue and rate-limit budget. One
+pool is one provider app: pools MUST NOT share an OAuth app, so budgets and
+tokens are independent per pool. Core
 groups the resulting sources into one activity and merges them by its priority
 list, where `<provider>.<worker_name>` names one pool. A pool name is
 permanent: core binds it to the first package it reports and refuses another

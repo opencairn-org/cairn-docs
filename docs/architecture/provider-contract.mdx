@@ -106,7 +106,11 @@ Jobs are routed to **pools** (from 0.5.0): every instance with the same
 pool on `cairn.jobs.<job>.<provider>.<worker_name>`. An external account is
 assigned to one pool; its imports, re-fetches, gear and metrics jobs go there.
 Re-parse goes to a pool of the source's own package. Several pools (e.g. an
-API importer and a file importer) can serve one provider side by side.
+API importer and a file importer) can serve one provider side by side: the
+user connects the same provider account once per pool they want, each
+connection with its own sync state, tokens and queue. Core groups the
+resulting sources into one activity and merges them by its priority list,
+where `<provider>.<worker_name>` names one pool.
 
 Create a **durable pull consumer** on `CAIRN_JOBS` for **every** job subject
 of your pool, filtered on the exact subject. `CAIRN_JOBS` is a work queue: it
@@ -294,6 +298,22 @@ error or rate limit — the UI would show "0 importable activities".
   (`cairn_rate_limits`) before each API call, sync the limiter from the
   provider's usage headers on every response, anchor 429 backoff to the real
   window reset, and report `RateLimitSnapshot`s opportunistically.
+
+## 9a. Account lookup (webhooks)
+
+A webhook event names the provider's owner id, not a Cairn account. Resolve it
+with request/reply on `cairn.accounts.lookup_by_provider_ext`:
+
+```json
+{"provider": "strava", "external_id": "<owner id>", "subscription_id": "<optional>",
+ "worker_name": "<your pool>"}
+```
+
+Reply: `{"account_id": "…", "user_id": "…"}` or `{"error": "not_found" |
+"auto_import_suspended" | …}`. `subscription_id` is preferred when known.
+`worker_name` MUST be sent (from 0.5.0): the same provider account may be
+connected once per pool, and core returns the connection of the asking pool
+(a connection without a pool matches any).
 
 ## 10. Conformance harness
 

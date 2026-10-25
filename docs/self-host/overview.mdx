@@ -86,6 +86,26 @@ the full variable list — in particular the three required secrets and the map
 tile settings if you would rather not hit the public OpenStreetMap tile server
 from your instance.
 
+## Upgrading to 0.5.0
+
+- **Core first, then both workers to 0.5.0.** Jobs, results and the account
+  lookup moved to per-pool subjects (`cairn.jobs.<job>.<provider>.<worker_name>`,
+  see [Provider contract](/architecture/provider-contract)); a 0.4 worker
+  keeps running against core 0.5 but receives no new jobs. Jobs queued before
+  the upgrade are drained by the 0.5 workers.
+- Migrations 00064–00066 add the parser/release stamps on sources, one
+  connection per worker pool per provider account, and the `worker_pools`
+  registry (filled from existing sources). Existing connections are assigned
+  to their pool automatically when the provider has one.
+- Every source imported before 0.5.0 is flagged "newer parser available";
+  use **Re-parse N out of date** on Connections to bring them up to date
+  without provider quota. Garmin activities need a re-fetch to pick up gear:
+  their archives have none.
+- Rate budgets are now per provider app and shown per connection.
+- Core publishes its release to the `cairn_core` KV bucket and workers refuse
+  an incompatible one. Before 1.0 the minor must match; from 1.0 on, minor and
+  patch releases of core stay compatible with older workers.
+
 ## Upgrading to 0.4.0
 
 - **Core first, then the workers.** Core 0.4.0 ignores unknown fields in job

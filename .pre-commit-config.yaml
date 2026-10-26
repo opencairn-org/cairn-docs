@@ -59,7 +59,7 @@ repos:
 
   # GitHub Actions and Gitea workflows
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.31.0
+    rev: v1.31.1
     hooks:
       - id: zizmor
         files: (^|/)(\.(github|gitea)/workflows/[^/]+\.ya?ml|\.pre-commit-config\.yaml)$

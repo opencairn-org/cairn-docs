@@ -139,7 +139,7 @@ function Steps({o}) {
         <li>
           Garmin accounts with MFA need their token store seeded once with an
           interactive login into the <code>garmin_tokens</code> volume, see{' '}
-          <Link to="/self-host/providers#garmin-python">Providers</Link>.
+          <Link to="/self-host/providers/garmin#mfa-accounts">Garmin</Link>.
         </li>
       )}
       {o.strava && o.stravaWebhook && (

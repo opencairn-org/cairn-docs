@@ -1,0 +1,91 @@
+---
+id: docker
+title: Docker Compose
+sidebar_position: 2
+---
+
+import ComposeConfigurator from '@site/src/components/ComposeConfigurator';
+
+# Docker Compose
+
+The simplest production deployment of Cairn is one host running Docker
+Compose: core, the provider workers you use, Postgres, NATS and, optionally,
+MinIO and a TLS-terminating reverse proxy. Everything core needs is in the
+`CAIRN_*` environment, so the whole stack is a `docker-compose.yml` and a
+`.env`.
+
+Pick your options and copy the two files below. They change as you click, and
+the **First start** steps underneath match what you picked.
+
+<ComposeConfigurator defaultRelease="v0.6.0" />
+
+## What runs
+
+| Service | Image | Role |
+| --- | --- | --- |
+| `core` | `ghcr.io/opencairn-org/cairn-core` | API, embedded web UI, migrations, NATS control plane. Distroless, runs as uid 65532 |
+| `worker-strava` | `ghcr.io/opencairn-org/cairn-provider-strava` | Strava imports. Stateless, talks to NATS only |
+| `worker-garmin` | `ghcr.io/opencairn-org/cairn-provider-garmin` | Garmin imports. Keeps its Garth token cache in `garmin_tokens`, runs as uid 10001 |
+| `postgres` | `timescale/timescaledb-ha` | Postgres 17 with TimescaleDB and PostGIS |
+| `nats` | `nats` | JetStream job and result bus; config is inlined as a compose `configs` entry |
+| `minio` | `minio/minio` | S3-compatible store for raw files, photos and map snapshots; core creates the bucket |
+| `caddy` | `caddy` | Reverse proxy with automatic TLS for `CAIRN_DOMAIN` |
+
+The workers never talk to Postgres or S3; they reach core through NATS, which
+is not published on the host. Core is the only service with a published port,
+and only when no proxy is bundled.
+
+Inline `configs` need Docker Compose v2.23.1 or newer. With an older Compose,
+write each `content:` block to a file and bind-mount it instead.
+
+## Data and backups
+
+All state lives in named volumes:
+
+| Volume | Holds | Backup |
+| --- | --- | --- |
+| `postgres_data` | every activity, user, token and setting | `docker compose exec postgres pg_dump -U cairn cairn > cairn.sql` |
+| `minio_data` | raw uploads, photos, cached map snapshots | copy the volume, or mirror the bucket with `mc` |
+| `nats_data` | queued jobs and the worker registry | disposable; queued jobs are re-created by the scheduler |
+| `garmin_tokens` | Garth sessions per Garmin account | disposable unless accounts use MFA |
+| `caddy_data` | certificates | disposable, Caddy re-issues them |
+
+`CAIRN_AUTH_MASTER_ENCRYPTION_KEY` in `.env` encrypts every stored credential.
+A database backup without that key is useless, so back the key up separately
+and never rotate it in place.
+
+## Upgrading
+
+Core is upgraded before the workers (see the release notes on the
+[overview](/self-host/overview) for what each release needs):
+
+```bash
+# bump CORE_TAG in .env, then
+docker compose pull core
+docker compose up -d core
+docker compose logs -f core      # migrations run on boot
+# bump STRAVA_TAG / GARMIN_TAG, then
+docker compose pull
+docker compose up -d
+```
+
+Core migrates the database itself because `CAIRN_DATABASE_AUTO_MIGRATE` is
+`true` in the generated file. That is right for one core instance. If you
+scale core to several replicas, set it to `false` and run the migration as a
+one-shot step before the rollout, as the
+[Kubernetes](/self-host/kubernetes) bundle does:
+
+```bash
+docker compose run --rm core migrate up
+```
+
+## Going further
+
+- Every other variable, from OIDC sign-in to email adapters, quotas and map
+  tiles, is on the [Configuration](/self-host/configuration) page. Add it to
+  the `environment` block of `core`.
+- [Providers](/self-host/providers) explains worker enrollment, the NATS
+  permissions an enrolled worker gets and the Garmin MFA seeding.
+- A worker can run on another machine: publish `4222` on the NATS service
+  (TLS and auth-callout strongly recommended) and point the worker's
+  `CAIRN_NATS_URL` at it.

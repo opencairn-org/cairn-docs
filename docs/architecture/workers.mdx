@@ -50,7 +50,7 @@ reconcile semantics — is the
 [provider contract](/architecture/provider-contract), verifiable mechanically
 with cairn-core's `worker-conformance` harness.
 
-:::info Standalone by design
+:::info[Standalone by design]
 Each worker is a standalone repository with its own build and release cycle.
 The Go worker carries its own worker SDK and NATS client, the Python worker
 implements the loop directly; neither imports core. The contract is the wire

@@ -52,7 +52,7 @@ A worker carries three independent versions (from 0.5.0):
 
 | Version | Form | Meaning | Bumped when |
 | --- | --- | --- | --- |
-| Release | `v0.5.1` | the core contract the worker implements | every release; major.minor follows core |
+| Release | `v0.6.0` | the core contract the worker implements | every release; major.minor follows core |
 | Dataset | `N` | format of the archived raw blob (`version` in the archive envelope) | a parser can no longer read the previous format |
 | Parser | `N.M` | parser for dataset `N`, output revision `M` | every change to the parsed output |
 
@@ -139,13 +139,14 @@ creation to these subjects:
 | `cairn.jobs.import_gear.<provider>.<worker_name>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
 | `cairn.jobs.backfill.<provider>.<worker_name>` | MAY | legacy full-history walk |
 
-The 0.4 job subjects without `<worker_name>` stay subscribable through 0.5 so
-an upgraded worker drains jobs queued before the upgrade (reuse the old
-durable name; a work queue lets only one pool drain them). They are removed in
-0.6. Results and lookups are pool-scoped only.
+The 0.4 job subjects without `<worker_name>` stay subscribable so an
+upgraded worker drains jobs queued before the upgrade (reuse the old durable
+name; a work queue lets only one pool drain them). The permission template
+still grants them in 0.6.0; they go away in a later release, so do not rely
+on them for new jobs. Results and lookups are pool-scoped only.
 Workers publish their own `fetch_source` sub-jobs (reconcile, webhooks) to
-their own pool subject. Results stay provider-scoped:
-`cairn.results.<job>.<provider>`.
+their own pool subject and their results to
+`cairn.results.<job>.<provider>.<worker_name>`.
 
 :::warning Why "every subject" is a MUST
 `CAIRN_JOBS` is a work-queue stream — messages for a subject nobody consumes

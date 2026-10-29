@@ -251,9 +251,10 @@ sequenceDiagram
 ## Upgrade from 0.4: draining queued jobs
 
 Jobs queued on the old provider-only subjects before the upgrade are not
-lost: for one minor release the permission template still lets the pool
-subscribe to them with its old durable name. Results and lookups are
-pool-scoped only. Removed in 0.6.
+lost: the permission template still lets the pool subscribe to them with its
+old durable name. Results and lookups are pool-scoped only. The grant was
+meant to last one minor release but is still present in 0.6.0; a later
+release removes it.
 
 ```mermaid
 sequenceDiagram

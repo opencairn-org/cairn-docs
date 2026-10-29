@@ -128,6 +128,7 @@ const config = {
             dropdownActiveClassDisabled: true,
             dropdownItemsAfter: [
               {type: 'html', value: '<hr class="dropdown-separator">'},
+              {to: '/release-notes', label: 'Release notes'},
               {to: '/versions', label: 'All versions'},
             ],
           },
@@ -148,6 +149,7 @@ const config = {
               {label: 'Self-host', to: '/self-host/overview'},
               {label: 'Architecture', to: '/architecture/overview'},
               {label: 'OAuth & MCP', to: '/integrations/oauth'},
+              {label: 'Release notes', to: '/release-notes'},
               {label: 'All versions', to: '/versions'},
             ],
           },

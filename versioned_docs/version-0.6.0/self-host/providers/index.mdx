@@ -1,0 +1,227 @@
+---
+id: index
+title: Providers
+sidebar_label: Overview
+sidebar_position: 1
+---
+
+# Providers
+
+Each provider is a **separate worker process** in its own repository. Core
+never imports worker code: the contract is the proto messages plus the NATS
+subjects (see [Provider workers](/architecture/workers)). You run only the
+workers you need. Two providers ship today:
+
+- [Strava](/self-host/providers/strava), a Go worker. Users bring their own
+  Strava API app; imports arrive by polling and, optionally, push webhooks.
+- [Garmin](/self-host/providers/garmin), a Python worker. Users enter their
+  Garmin credentials; the worker imports activities, gear and daily health
+  metrics.
+
+This page covers what is common to every provider: how a worker fits into
+core, how it is enrolled and authenticated, and how workers and connections
+are managed.
+
+## How a provider fits in
+
+- **Workers and pools.** A worker runs under a name (`CAIRN_WORKER_NAME`,
+  for example `strava-fetcher`). All instances with that name form one
+  **pool**; they share one durable consumer per job subject, so adding an
+  instance adds throughput. Jobs, discovery requests and results travel on
+  per-pool NATS subjects, `cairn.jobs.<job>.<provider>.<name>` and friends.
+  Several pools can serve one provider, for example two Strava workers of
+  different versions.
+- **Connections.** A user links a provider account on the **Connections**
+  page. Each connection belongs to one pool; when a provider has several,
+  the user picks one and can move the connection later. The page shows the
+  sync status of every account: imported and provider totals, the
+  watermark, rate budgets, queue counts, and whether sources are out of
+  date.
+- **Sync.** The scheduler reconciles every connected account on
+  `CAIRN_SCHEDULER_POLLING_INTERVAL`; the user can also start a full sync
+  (with a preview of what it would fetch), sync gear, toggle auto import,
+  set a poll interval and a label, and re-parse out-of-date sources from
+  the archive without spending provider quota. Provider webhooks arrive at
+  core (`POST /webhooks/{provider}`) and are forwarded to the pool over NATS.
+- **Versions.** Core publishes its release to the `cairn_core` KV bucket;
+  a worker refuses an incompatible core (same `major.minor` before 1.0).
+  Each source records the parser version that produced it; a newer parser in
+  the pool flags the source "newer parser available" on the Connections and
+  Manage pages.
+- **Rate limits.** Budgets are tracked per provider app and shown per
+  connection, so one user's backfill cannot starve another's app.
+
+## Enrollment
+
+In production each worker authenticates to NATS with a one-time
+**enrollment token** (NATS auth-callout mints scoped credentials; set it up
+as described in [NATS auth-callout](#nats-auth-callout)). Create an
+enrollment as an admin, in the admin UI (**Worker onboarding**) or over the
+API. The request is authenticated like any other API call: an admin's
+session cookie or personal access token.
+
+```bash
+curl -X POST https://cairn.example/api/admin/worker-enrollments \
+  -H "Authorization: Bearer cairn_pat_..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "strava-fetcher", "provider": "strava", "expires_in_hours": 720, "note": "prod Strava"}'
+```
+
+- `name` (required): the worker name — lowercase letters, digits and hyphens,
+  no leading or trailing hyphen. The worker's `CAIRN_WORKER_NAME` must equal
+  it.
+- `provider` (required): the provider type the worker serves, set by the
+  admin. It scopes the worker's NATS permissions. Any well-formed type is
+  accepted, not only `strava` and `garmin`: 1–48 lowercase letters, digits,
+  hyphens or underscores (`[a-z0-9_-]`), so it can't carry NATS wildcards or
+  subject separators. A missing or malformed provider is answered with `400`
+  (`provider required — lowercase letters, digits, hyphens, underscores`).
+  Since core v0.3.2; before that only the built-in providers were accepted.
+- `expires_in_hours` (optional): defaults to `8760` (365 days), which is also
+  the cap.
+- `note` (optional): free text shown in the admin list.
+
+The `201` response carries the enrollment record and the plaintext `token`,
+shown once. The worker's configuration is `CAIRN_WORKER_NAME` (the `name`)
+plus the token from the admin as `CAIRN_WORKER_ENROLLMENT_TOKEN`.
+`GET /api/admin/worker-enrollments` lists enrollments and `providers`, the
+built-in providers as suggestions (the admin UI offers them in the provider
+field, which also takes any other well-formed type),
+`POST /api/admin/worker-enrollments/{id}/revoke` revokes one and
+`POST /api/admin/worker-enrollments/{id}/prolong` moves its expiry, even after
+it has lapsed. Both take an optional JSON body: `{"reason": "..."}` for revoke,
+`{"expires_in_hours": 720}` for prolong, with the same default and cap of
+`8760`. The body can be left out; one that is not valid JSON is answered with
+`400`.
+
+### Other providers
+
+A worker for a provider core does not ship (say `polar`) is enrolled the same
+way: the admin creates an enrollment with `"provider": "polar"` and hands the
+worker its name and token. It is admitted and scoped to the `polar` subjects
+only (`cairn.jobs.*.polar.<name>`, `cairn.tokens.polar.>`, …), never another
+provider's or another pool's. Several workers with different names can serve
+one provider; each connection is then assigned to one of them on the
+Connections page. Linking user accounts for a new provider still needs core
+support: OAuth connect and job dispatch use core's built-in provider list.
+
+### Re-enroll required
+
+Before core v0.3.1 an enrollment carried no provider. Core refuses those at
+connect (reason `enrollment_missing_provider`) and cannot fill the provider in
+afterwards. The enrollment list marks them with `"reenroll_required": true`
+and the admin UI with a **re-enroll required** badge: create a new enrollment
+with a provider, give the worker its token, and revoke the old one.
+
+### NATS auth-callout
+
+Core answers NATS auth-callout requests when `CAIRN_NATS_AUTH_CALLOUT=true`.
+Core and the admitted workers share one NATS account, named by
+`CAIRN_NATS_WORKER_ACCOUNT`; core connects as a user that bypasses the
+callout. Worker enrollment under NATS auth requires core v0.3.1 or later.
+
+1. Bootstrap the account signing key once:
+   `POST /api/admin/nats/bootstrap-account-key` returns its `public_key`.
+2. Run nats-server with this config (it is `docker/nats-auth-callout.conf` in
+   cairn-core). `$CAIRN_NATS_AUTH_ISSUER` (the public key) and
+   `$CAIRN_NATS_PASSWORD` are read from nats-server's environment.
+
+   ```hcl
+   http_port: 8222
+   jetstream { store_dir: "/data" }
+   max_payload: 8MB
+
+   accounts {
+     CAIRN {
+       jetstream: enabled
+       users: [
+         # core itself; listed in auth_users, so it bypasses the callout
+         { user: cairn-core, password: $CAIRN_NATS_PASSWORD }
+       ]
+     }
+   }
+
+   authorization {
+     auth_callout {
+       issuer: $CAIRN_NATS_AUTH_ISSUER
+       account: CAIRN
+       auth_users: [ cairn-core ]
+     }
+   }
+   ```
+
+3. Start core with `CAIRN_NATS_USERNAME=cairn-core`, the same
+   `CAIRN_NATS_PASSWORD`, `CAIRN_NATS_AUTH_CALLOUT=true` and
+   `CAIRN_NATS_WORKER_ACCOUNT=CAIRN`. Core does not start if the auth-callout
+   is on and the account is missing.
+4. Create an enrollment per worker (its `name` equal to the worker's
+   `CAIRN_WORKER_NAME`) and set `CAIRN_WORKER_ENROLLMENT_TOKEN` on it. The
+   Strava and Garmin workers (v0.3.1 or later) both present only the token on
+   CONNECT.
+
+Strava workers up to v0.3.0 also present an nkey and fail unless nats-server
+sends a connect nonce. For them, add a seedless placeholder nkey user to the
+`CAIRN` users, e.g.
+`{ nkey: UBZQLXX3CXHIQZ2VZ4WSKLWB3DOT6ZI4WMLTQHCFPRTFDQ2A7PPABH44 }` (generate
+your own with `nk -gen user -pubout`); core's `docker/nats-auth-callout.conf`
+still contains one. Strava v0.3.1 and Garmin v0.3.1 do not need it.
+
+A worker can still use a static NATS user (`CAIRN_NATS_USER` /
+`CAIRN_NATS_PASSWORD`) instead, for example on a server without the
+auth-callout; under the auth-callout add that user to the `CAIRN` account and
+to `auth_users`. Grant it the [permissions](#nats-permissions) for its
+provider.
+
+## Managing workers
+
+Administrators see the fleet in the admin area and on `/api/admin/*`:
+
+- **Workers** (`GET /api/admin/workers`): every live instance with its
+  presence heartbeat, release and manifest (the data types and jobs it
+  declares). A manifest newer than what a source was parsed with is what
+  flags the source for re-parse.
+- **Pools** (`GET /api/admin/worker-pools`): registered pools per provider,
+  the package bound to each name, and **retire** for a pool that is gone for
+  good (`POST /api/admin/worker-pools/{provider}/{name}/retire`).
+- **Enrollments** (`GET /api/admin/worker-enrollments`): revoke and prolong,
+  see [Enrollment](#enrollment).
+- **Health** (`GET /api/admin/health`) grades the fleet: live instances with
+  a compatible release are healthy, an incompatible release is degraded, a
+  registered pool without a live instance is offline. The admin event stream
+  reports workers registering, going offline, deregistering or becoming
+  degraded, and dead-lettered jobs, see
+  [Administration](/self-host/administration#health-and-observability).
+- **Import queue and dead letters** (`/api/admin/jobs`, `/api/admin/dlq`):
+  retry, cancel and replay, see
+  [Administration](/self-host/administration#imports-and-workers).
+
+## NATS permissions
+
+When NATS runs with auth-callout, an enrolled worker gets core's **standard
+permission template**, derived from the enrollment's provider `<p>`, its worker name `<n>` and the
+worker key `<wk>` = `<n>-<p>` (for example `strava-fetcher-strava`). It allows:
+
+| | Subjects |
+| --- | --- |
+| Subscribe | `cairn.jobs.{fetch_source,parse_blob,backfill,reconcile,import_metrics,import_gear}.<p>.<n>` (its pool; the same without `.<n>` through 0.5 to drain old jobs), `cairn.cmd.worker.<wk>.>`, `cairn.discover.<p>.<n>` (serving discover requests), `cairn.webhooks.<wk>.event`, `cairn.webhooks.<wk>.verify`, `_INBOX.>` |
+| Publish | `cairn.results.{fetch_source,parse_blob,backfill,import_metrics,import_gear}.<p>.<n>`, `cairn.results.reconcile.<p>.<n>.*` (account-suffixed), `cairn.accounts.lookup.<p>.<n>`, `cairn.jobs.fetch_source.<p>.<n>` (sub-jobs from reconcile and webhooks), `cairn.workers.<wk>.>`, `cairn.tokens.<p>.>`, `cairn.creds.<p>.get`, `cairn.blobs.presign_upload.<p>`, `cairn.blobs.presign_download.<p>`, `_INBOX.>` |
+| JetStream API | `$JS.API.STREAM.NAMES` (stream lookup by subject); consumer create on `CAIRN_JOBS` filtered to the job subjects above and on `CAIRN_WEBHOOKS` filtered to `cairn.webhooks.<wk>.event`, plus `$JS.API.CONSUMER.DURABLE.CREATE.CAIRN_JOBS.*`; consumer info, `MSG.NEXT` and `$JS.ACK.<stream>.>` on both streams; stream info, direct get, message get and `$KV.<bucket>.>` on the `cairn_worker_presence`, `cairn_worker_manifests` and `cairn_rate_limits` KV buckets; stream info and gets (read-only) on `cairn_core`, which holds core's release |
+
+The job subjects are exact: consumers filter on
+`cairn.jobs.<job>.<p>.<n>`, and `CAIRN_JOBS` (a work queue) refuses a second
+consumer with the same filter, so all instances of one pool share one durable
+per subject. Run core v0.3.1 or
+later with NATS auth; earlier versions did not admit enrolled workers.
+Installations running NATS without auth are unaffected.
+
+If you give a worker a static NATS user instead (`CAIRN_NATS_USER` /
+`CAIRN_NATS_PASSWORD`), grant that user the same subjects for its provider.
+
+## Writing your own provider
+
+A provider only needs to: register via enrollment, consume the
+`cairn.jobs.<job_type>.<provider>` subjects, and publish
+`cairn.worker.v1.JobResult` events, staying within the
+[permissions](#nats-permissions) above. Use
+the committed proto stubs (Go or Python) as your contract. See
+[Provider workers](/architecture/workers).

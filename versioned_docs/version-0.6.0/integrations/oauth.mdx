@@ -1,0 +1,131 @@
+---
+id: oauth
+title: OAuth 2.1 for apps & agents
+sidebar_position: 1
+---
+
+# OAuth 2.1 for apps & agents
+
+Cairn is both an **OIDC client** (you can log in *with* Google/Authentik/…) and
+an **OAuth 2.1 authorization server** (apps and agents log in *to* Cairn). The
+authorization-server side is what native mobile apps, third-party clients and
+[MCP](/integrations/mcp) agents use.
+
+## Why OAuth here
+
+Browsers use a session cookie; the CLI can use a Personal Access Token. But a
+native app or an AI agent should not hold your password or a god-mode token.
+OAuth 2.1 gives them a **scoped, revocable** grant via a proper consent flow.
+
+## Supported flows
+
+- **Authorization Code + PKCE** — for native (iOS/Android), SPAs and any
+  third-party client. PKCE is mandatory.
+- **Device authorization grant (RFC 8628)** — for TVs, watches, CLIs and
+  anything without a browser, since 0.6.0. See
+  [Device sign-in](#device-authorization).
+- **Refresh tokens** — long-lived access without re-consent.
+- **Dynamic Client Registration (RFC 7591)** — clients (including MCP clients)
+  can self-register, no manual app setup. A client may send `software_id` and
+  `software_version`; Cairn stores and echoes them so the authorized-apps
+  list can name the application behind a client.
+
+Loopback redirects follow RFC 8252 §7.3: a registered `http://127.0.0.1/...`
+or `http://[::1]/...` redirect URI matches any port, and the authorization
+code is sent to the port the app actually bound. `localhost` and custom
+schemes still match exactly.
+
+## Discovery
+
+Cairn publishes standard metadata so clients can configure themselves:
+
+- **Authorization Server Metadata** (RFC 8414):
+  `GET /.well-known/oauth-authorization-server`, including
+  `scopes_supported`.
+- **Protected Resource Metadata** (RFC 9728):
+  `GET /.well-known/oauth-protected-resource` — points resources (the API, the
+  MCP endpoint) at this authorization server.
+- **Instance info** for a server picker: `AuthService.GetInstanceInfo` is
+  public and returns the release, commit and build time, whether federation
+  and OAuth are on, whether registration is open and the scope catalog.
+
+## Scopes
+
+Access tokens carry a space-separated scope set. Every family has a `:read`
+and a `:write` scope; a read call accepts either, a mutating call needs
+`:write`. Cookie sessions and personal access tokens are not scoped: they
+carry the user's full access.
+
+| Family | Covers |
+| --- | --- |
+| `activities` | `ActivityService` and `StatsService`: activities, sources, streams, uploads, records, stats |
+| `gear` | `GearService` |
+| `notifications` | `NotificationService`: list, mark read, preferences, webhooks |
+| `connections` | `ExternalAccountService`: provider connections and sync status |
+| `segments` | `SegmentService`: segments, efforts, leaderboards, authoring |
+| `training` | `MetricsService`: training load, best-effort history, health and athlete metrics, the metric store |
+| `profile` | `SettingsService` and the profile and preference RPCs of `AuthService` |
+| `social` | `SocialService`: feeds, follows, kudos, comments, clubs |
+| `devices` | approving another device's sign-in (`LookupDeviceAuthorization`, `DecideDeviceAuthorization`); never part of a default grant |
+
+The default grant of a dynamically registered client is every `:read` scope
+except `devices:read`.
+
+How scopes are enforced differs by surface:
+
+- **Connect** checks the family per RPC since 0.6.0. An `ActivityService`
+  read needs `activities:read`, a `GearService` write needs `gear:write`,
+  and so on. Read or write is decided by the method name (`Get`, `List`,
+  `Search`, `Stream`, `Query`, `Export`, … are reads). Tokens issued before
+  0.6.0 keep working for the families they hold; re-authorize to pick up the
+  new read scopes.
+- **REST** keeps the coarse rule: a token without any `:write` scope may use
+  `GET` and `HEAD` only; any `:write` scope unlocks the mutating methods.
+- Some RPCs refuse OAuth tokens altogether and need a cookie session:
+  `Logout`, `ChangePassword`, sessions, personal access tokens, authorized
+  apps, the passkey second factor and everything on `AdminService`.
+
+The full RPC-to-scope map is `docs/api-scopes.md` in cairn-core; every
+`rpc` in the proto carries its line as a `// Scope:` comment.
+
+## Connecting a client (typical)
+
+1. Client fetches the AS metadata.
+2. Client registers (DCR) or uses a pre-registered `client_id`.
+3. Client starts Authorization Code + PKCE; you approve the requested scopes on
+   the **consent screen**.
+4. Client exchanges the code for an access + refresh token.
+5. Client calls the API with `Authorization: Bearer <access token>`.
+
+## Device authorization
+
+A device without a browser asks `POST /oauth/device_authorization` with its
+`client_id` and `scope` and gets a `device_code`, a short `user_code`, the
+`verification_uri` (`/oauth/device` on your instance) and a
+`verification_uri_complete` it can show as a QR code. It then polls
+`POST /oauth/token` with
+`grant_type=urn:ietf:params:oauth:grant-type:device_code`, no faster than
+`CAIRN_AUTH_OAUTH_DEVICE_POLL_INTERVAL`, and receives `authorization_pending`,
+`slow_down`, `access_denied` or `expired_token` until the code is decided.
+A code pair lives for `CAIRN_AUTH_OAUTH_DEVICE_CODE_TTL` (10 minutes).
+
+You approve on something that is already signed in: the **Sign in a device**
+page in the browser, where you type the code and see which client asks for
+which scopes, or an app that calls `LookupDeviceAuthorization` and
+`DecideDeviceAuthorization` with the `devices:*` scopes. An approving app
+can grant at most the scopes it holds itself. Dynamically registered clients
+get the grant by default.
+
+## Authorized apps
+
+**Settings → Authorized apps** lists every OAuth client that holds a grant
+for your account, with the software it reported, and revokes a client's
+grants and tokens in one step (`GET|DELETE /api/oauth/apps[/{client_id}]`,
+`ListAuthorizedApps` / `RevokeAuthorizedApp`). Tokens stop working
+immediately.
+
+:::note
+Sessions and Personal Access Tokens keep working for browsers and the CLI — the
+bearer access token is just a third path the same auth middleware understands.
+See [Account & security](/using-cairn/account) for the account side.
+:::

@@ -6,8 +6,15 @@ import {
   useLatestVersion,
 } from '@docusaurus/plugin-content-docs/client';
 
-const changelogUrl = (version) =>
-  `https://github.com/opencairn-org/cairn-core/blob/v${version.name}/CHANGELOG.md`;
+// Documentation-only versions (no core release of that number) point at the
+// core release they document.
+const docsOnlyVersions = {'0.3.4': '0.3.3', '0.3.6': '0.3.3'};
+
+// Heading slug on /release-notes: "0.6.0" -> "#060".
+const releaseNotesUrl = (version) => {
+  const release = docsOnlyVersions[version.name] ?? version.name;
+  return `/release-notes#${release.replaceAll('.', '')}`;
+};
 
 function VersionRows({versions}) {
   return versions.map((version) => (
@@ -20,7 +27,7 @@ function VersionRows({versions}) {
         {version.name === 'current' ? (
           <span>—</span>
         ) : (
-          <Link href={changelogUrl(version)}>Release notes</Link>
+          <Link to={releaseNotesUrl(version)}>Release notes</Link>
         )}
       </td>
     </tr>

@@ -89,7 +89,7 @@ the Secret.
   bundle mounts it as an `emptyDir`, so a restarted pod logs in again from the
   credentials delivered over NATS. Mount a persistent volume there if MFA
   accounts should not be re-prompted on every restart (see
-  [Providers](/self-host/providers)). Replicas do not share it. The image runs
+  [Garmin](/self-host/providers/garmin#mfa-accounts)). Replicas do not share it. The image runs
   as uid/gid 10001; an `emptyDir` is writable for it, a persistent volume
   needs `securityContext.fsGroup: 10001` on the pod (or a one-off
   `chown -R 10001:10001` if it holds files from an older, root-run image).

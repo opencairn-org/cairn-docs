@@ -1,0 +1,9 @@
+{
+  "label": "Architecture",
+  "position": 4,
+  "link": {
+    "type": "doc",
+    "id": "architecture/overview"
+  },
+  "collapsed": false
+}

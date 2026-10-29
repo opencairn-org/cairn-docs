@@ -1,0 +1,53 @@
+---
+id: account
+title: Account & security
+sidebar_position: 9
+---
+
+# Account & security
+
+Your sign-in methods, sessions and connected applications are managed under
+**Settings**. Everything there has a REST route and, since 0.6.0, a Connect
+RPC on `AuthService`; these need a cookie session, OAuth tokens are refused.
+
+## Signing in
+
+- **Password.** Changing it (`POST /auth/password/change`, `ChangePassword`)
+  ends your other sessions; a reset through the email link ends all of them.
+  A password that an administrator set for you, including the very first
+  admin password of an instance, has to be replaced at your next sign-in.
+- **Lockout.** Ten failed attempts for your account, or twenty from one
+  address, within ten minutes lock sign-in for ten minutes. Passkey and OIDC
+  sign-ins are not affected.
+- **Passkeys** (WebAuthn) sign you in without a password. Since 0.6.0 a
+  passkey can also be a **second factor**: switch it on in **Settings →
+  Passkeys** (`PUT /api/passkeys/second-factor`) and a password sign-in then
+  asks for a passkey assertion before issuing the session. The toggle needs
+  at least one registered passkey.
+- **Identity providers.** When the instance offers OIDC sign-in, you can link
+  and unlink providers (`GET|DELETE /api/identities[/{id}]`). The last
+  remaining sign-in method cannot be unlinked.
+- **Email changes** are refused on the self-service routes; ask an
+  administrator.
+
+## Sessions and tokens
+
+- **Sessions**: list the devices you are signed in on and revoke one
+  (`GET|DELETE /api/sessions[/{id}]`, `ListSessions` / `RevokeSession`).
+  **Logout** can end the current session or every session (`all_devices`).
+- **Personal access tokens** for scripts and the CLI: create, list and revoke
+  under **Settings → Tokens** (`/api/pats`). A token carries your full access
+  and is shown once.
+- **Authorized apps**: the OAuth clients that hold a grant for your account,
+  revocable in one step, see
+  [Authorized apps](/integrations/oauth#authorized-apps).
+- **Sign in a device**: when a TV, watch or CLI shows you a code, enter it at
+  `/oauth/device` on your instance and approve the scopes it asks for, see
+  [Device authorization](/integrations/oauth#device-authorization).
+
+## Profile and quota
+
+`PUT /api/profile` (`UpdateProfile`) changes display name and preferences;
+visibility, privacy zones and sharing are on the
+[Social](/using-cairn/social) side. `GET /api/quota` (`GetQuota`) shows how
+many activities you use of a per-user limit the administrator may have set.

@@ -66,6 +66,23 @@ actions:
   track changed after the snapshot was cached or a render failed
   (`POST /api/activities/{id}/map/regenerate`).
 - Merge policy and source handling, see [Merging sources](/using-cairn/merge).
+- **Delete** soft-deletes the activity and denylists its sources, see
+  [Removing things](/using-cairn/import#removing-things).
+
+## Photos
+
+Activities carry photos: your uploads and the photos a provider mirrors.
+Since 0.6.0 every photo has three variants, the original, a 1280 px medium
+JPEG and a 320 px thumbnail, plus a **blurhash** placeholder the web UI shows
+while the image loads. `GET /api/activities/{id}/attachments` lists them with
+a URL per variant.
+
+Photos, map snapshots and exports are handed out as short-lived **signed
+URLs** a client fetches with a plain GET: either a presigned object-store URL
+when the instance sets `CAIRN_STORAGE_PUBLIC_ENDPOINT`, or core's own
+`GET /content/{token}` route (15 minutes) otherwise. Photos stored before
+0.6.0 get their variants from the operator's one-off
+`cairn attachments backfill-variants`.
 
 ## Related
 

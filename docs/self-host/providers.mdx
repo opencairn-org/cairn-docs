@@ -1,7 +1,7 @@
 ---
 id: providers
 title: Providers (Strava & Garmin)
-sidebar_position: 3
+sidebar_position: 4
 ---
 
 # Providers
@@ -143,7 +143,7 @@ docker run --rm \
   -e CAIRN_NATS_URL=nats://nats:4222 \
   -e CAIRN_WORKER_NAME=strava-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
-  ghcr.io/opencairn-org/cairn-provider-strava:v0.4.0
+  ghcr.io/opencairn-org/cairn-provider-strava:v0.6.0
 ```
 
 Only one Strava worker instance should own the webhook subject — set
@@ -179,7 +179,7 @@ docker run --rm \
   -e CAIRN_WORKER_NAME=garmin-fetcher \
   -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
   -v garmin-tokens:/data \
-  ghcr.io/opencairn-org/cairn-provider-garmin:v0.4.0
+  ghcr.io/opencairn-org/cairn-provider-garmin:v0.6.0
 ```
 
 Since 0.4.0 the worker imports [gear](/using-cairn/gear): `import_gear`

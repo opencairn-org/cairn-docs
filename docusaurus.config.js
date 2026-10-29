@@ -168,6 +168,10 @@ const config = {
                 label: 'cairn-provider-garmin',
                 href: 'https://github.com/opencairn-org/cairn-provider-garmin',
               },
+              {
+                label: 'cairn-kmp (native app)',
+                href: 'https://github.com/opencairn-org/cairn-kmp',
+              },
             ],
           },
           {

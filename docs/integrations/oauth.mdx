@@ -13,6 +13,10 @@ authorization-server side is what native mobile apps, third-party clients and
 
 ## Why OAuth here
 
+Cairn's own [native app](/clients/native-app) is one such client: it registers
+itself, signs in through the browser or by device code, and holds only read
+scopes.
+
 Browsers use a session cookie; the CLI can use a Personal Access Token. But a
 native app or an AI agent should not hold your password or a god-mode token.
 OAuth 2.1 gives them a **scoped, revocable** grant via a proper consent flow.

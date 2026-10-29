@@ -147,7 +147,7 @@ Workers publish their own `fetch_source` sub-jobs (reconcile, webhooks) to
 their own pool subject. Results stay provider-scoped:
 `cairn.results.<job>.<provider>`.
 
-:::warning Why "every subject" is a MUST
+:::warning[Why "every subject" is a MUST]
 `CAIRN_JOBS` is a work-queue stream — messages for a subject nobody consumes
 are retained forever. A worker without a reconcile consumer leaves the
 scheduler's reconcile jobs queued indefinitely and new activities are never

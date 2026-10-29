@@ -31,60 +31,66 @@ Cairn is built to be self-hosted. A production deployment is:
 
 ## Choose a path
 
-- [Docker Compose](#docker-compose) — simplest single-host deployment.
+- [Docker Compose](./docker.mdx) — simplest single-host deployment,
+  with a configurator that writes the compose file for your providers.
 - [Kubernetes](/self-host/kubernetes) — manifests for a cluster.
 - [Configuration](/self-host/configuration) — environment variables.
-- [Providers](/self-host/providers) — wiring Strava and Garmin.
+- [Providers](/self-host/providers) — enrollment, worker management, and
+  the [Strava](/self-host/providers/strava) and
+  [Garmin](/self-host/providers/garmin) workers.
+- [Administration](/self-host/administration) — users, audit log,
+  maintenance operations.
 
 ## Docker Compose
 
-Pull the published images and run them together. Core embeds the web UI, so
-there is nothing else to serve.
+The [Docker Compose](./docker.mdx) page has a configurator: pick the
+providers, object storage, reverse proxy and worker authentication you want
+and copy the resulting `docker-compose.yml` and `.env`. Pin the image tags to
+a release rather than `latest`, and upgrade core and the workers together.
 
-```yaml title="docker-compose.yml (sketch)"
-services:
-  core:
-    image: ghcr.io/opencairn-org/cairn-core:v0.4.0
-    env_file: .env
-    ports: ["8080:8080"]
-    depends_on: [postgres, nats]
-  worker-strava:
-    image: ghcr.io/opencairn-org/cairn-provider-strava:v0.4.0
-    env_file: .env
-    # one enrollment per worker, only with NATS auth-callout
-    environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${STRAVA_ENROLLMENT_TOKEN:-}" }
-  worker-garmin:
-    image: ghcr.io/opencairn-org/cairn-provider-garmin:v0.4.0
-    env_file: .env
-    environment: { CAIRN_WORKER_ENROLLMENT_TOKEN: "${GARMIN_ENROLLMENT_TOKEN:-}" }
-    volumes: ["garmin-tokens:/data"]
-  postgres:
-    image: timescale/timescaledb-ha:pg17-ts2.27
-  nats: { image: nats:2.15.1-alpine, command: ["-js"] }
-  minio: { image: minio/minio, command: ["server", "/data"] }
-volumes:
-  garmin-tokens:
-```
+## Upgrading to 0.6.0
 
-Pin the image tags to a release rather than `latest`, and upgrade core and the
-workers together; this page documents core v0.4.0 with the Strava worker
-v0.4.0 and the Garmin worker v0.4.0.
+- **No worker upgrade is required.** The worker contract is unchanged since
+  0.5.0, so 0.5.0 workers keep working against core 0.6.0. The 0.6.0 worker
+  images were released alongside core and differ only in build tooling;
+  upgrade them when convenient, core first as always.
+- Migrations 00067–00073 run on start: OAuth client software metadata, photo
+  variants, reimport previews, the passkey second factor, login challenge
+  purposes, device codes and persisted maintenance jobs.
+- **Forced password change.** A password that was set by an administrator
+  (the bootstrap admin, accounts created with an initial password, admin
+  resets) must be replaced at the next password sign-in. Expect the prompt on
+  your own admin account after the upgrade. Passkey and OIDC sign-ins are not
+  affected.
+- **Sign-in lockout.** Ten failed password attempts per account or twenty per
+  address within ten minutes lock that key for ten minutes. Every failure is
+  in the audit log and a lock raises an admin event, see
+  [Administration](/self-host/administration).
+- **OAuth scopes are enforced per family on Connect.** A token now needs
+  `activities:read` for `ActivityService`, `gear:*` for `GearService` and so
+  on, and `QueryMetricSeries` needs `training:read` instead of
+  `training:write`. Tokens issued before 0.6.0 keep the families they hold;
+  clients re-authorize to pick up the new read scopes. REST keeps the coarse
+  read/write rule. See [OAuth](/integrations/oauth#scopes).
+- **Photos get display variants** (320 px thumbnail, 1280 px medium, a
+  blurhash). New uploads and mirrored photos get them on ingest; convert the
+  existing ones once:
 
-The Garmin worker runs as the unprivileged user `cairn` (uid/gid 10001) and
-keeps its Garmin token cache under `/data`. A new named volume is created with
-the right owner. A volume or bind mount written by an older image (which ran as
-root) has to be handed over once, otherwise the cached tokens cannot be read:
+  ```bash
+  docker compose run --rm core attachments backfill-variants   # --batch 100
+  ```
 
-```bash
-docker run --rm -v garmin-tokens:/data alpine chown -R 10001:10001 /data
-```
-
-Put a TLS-terminating reverse proxy (Caddy, nginx, Traefik) in front of core,
-and set `CAIRN_INSTANCE_TRUSTED_PROXIES` to its address so client IPs are read
-from the forwarded headers. See [Configuration](/self-host/configuration) for
-the full variable list — in particular the three required secrets and the map
-tile settings if you would rather not hit the public OpenStreetMap tile server
-from your instance.
+- New optional settings: `CAIRN_STORAGE_PUBLIC_ENDPOINT` hands clients
+  presigned object-store URLs instead of serving binary content through core,
+  and `CAIRN_AUTH_OAUTH_DEVICE_CODE_TTL` / `..._DEVICE_POLL_INTERVAL` tune
+  the new device authorization grant. See
+  [Configuration](/self-host/configuration).
+- Core now also speaks cleartext HTTP/2 (h2c) for native Connect and gRPC
+  clients, and streaming RPCs are exempt from `CAIRN_HTTP_WRITE_TIMEOUT`.
+- Administrators get instance-wide maintenance operations (segment rematch,
+  best-effort, merge and training-load recomputes, purge of soft-deleted
+  activities, blob garbage collection), see
+  [Administration](/self-host/administration#maintenance-operations).
 
 ## Upgrading to 0.5.0
 

@@ -1,0 +1,248 @@
+---
+id: configuration
+title: Configuration
+sidebar_position: 3
+---
+
+# Configuration
+
+All configuration is via environment variables prefixed with **`CAIRN_`**.
+Each subsystem has its own group (`CAIRN_<GROUP>_<KEY>`), read once at
+startup. This page lists every variable the server reads, with its default in
+the second column. A dash means the variable has no default and stays unset
+unless you provide it.
+
+Only the `CAIRN_`-prefixed name is read. Up to 0.2.x a missing `CAIRN_*`
+variable fell back to the bare name, so host variables such as `URL`,
+`USERNAME`, `PASSWORD` or `SESSION_SECRET` could fill Cairn settings; since
+0.3.0 they are ignored. Rename any unprefixed variables you relied on before
+upgrading.
+
+Three variables are **required**: `CAIRN_DATABASE_URL`,
+`CAIRN_AUTH_SESSION_SECRET` and `CAIRN_AUTH_MASTER_ENCRYPTION_KEY`. The server
+refuses to start when one is missing **or set to an empty value**. An optional
+variable set to an empty value means empty, not its default: `CAIRN_NATS_URL=`
+keeps NATS disabled.
+
+`cairn config help` prints every variable the config struct reads, with its
+type, default and whether it is required:
+
+```bash
+docker run --rm ghcr.io/opencairn-org/cairn-core:v0.6.0 config help
+```
+
+The OIDC variables (keyed by provider id) and `CAIRN_HTTP_RATE_LIMIT_PER_MIN`
+are read separately and do not appear in that list.
+
+:::tip
+`dev.env.example` in `cairn-core` is a working local set for the Compose dev
+stack. Copy it to `dev.env`; `make dev-server` sources it.
+:::
+
+## Database
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_DATABASE_URL` | — | **required** — `postgres://user:pass@host:5432/cairn` |
+| `CAIRN_DATABASE_AUTO_MIGRATE` | `false` | run the goose migrations on boot |
+| `CAIRN_DATABASE_MAX_CONNS` / `..._MIN_CONNS` | `10` / `2` | connection pool bounds |
+| `CAIRN_DATABASE_STATEMENT_TIMEOUT` | `30s` | per-statement timeout |
+| `CAIRN_DATABASE_LOCK_TIMEOUT` | `5s` | how long a statement waits for a lock |
+| `CAIRN_DATABASE_IDLE_IN_TX_TIMEOUT` | `60s` | ends sessions idle inside a transaction |
+| `CAIRN_DATABASE_APPLICATION_NAME` | `cairn` | shown in `pg_stat_activity` |
+
+## HTTP
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_HTTP_ADDR` | `0.0.0.0:8080` | listen address |
+| `CAIRN_HTTP_PUBLIC_BASE_URL` | `http://localhost:8080` | external URL — used for OAuth redirects, share links and federation |
+| `CAIRN_HTTP_CORS_ALLOWED_ORIGINS` | — | comma-separated origins for browser clients served from another origin |
+| `CAIRN_HTTP_TLS_CERT_FILE` / `..._TLS_KEY_FILE` | — | terminate TLS in-process instead of at a proxy |
+| `CAIRN_HTTP_READ_TIMEOUT` / `..._WRITE_TIMEOUT` / `..._IDLE_TIMEOUT` | `30s` / `5m` / `120s` | server timeouts; the write timeout is long because uploads and exports stream. Streaming RPCs (`StreamActivityEvents`, `StreamNotifications`, `StreamAdminEvents`) are exempt from it, unary calls keep it |
+| `CAIRN_HTTP_SHUTDOWN_TIMEOUT` | `30s` | grace period on SIGTERM |
+| `CAIRN_HTTP_RATE_LIMIT_PER_MIN` | `600` | requests per minute per session (per IP when anonymous); generous so the polling web UI is never throttled. Values that are not a positive number are ignored |
+
+The listener speaks HTTP/1.1 and cleartext HTTP/2 (h2c, prior knowledge) on
+the same port, so native Connect and gRPC clients can multiplex and stream
+over one connection without a TLS-terminating proxy in front. Browsers never
+negotiate h2c; behind a proxy they get HTTP/2 from the proxy.
+
+## Auth
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_AUTH_SESSION_SECRET` | — | **required** — signs sessions and tokens; set a long random value |
+| `CAIRN_AUTH_MASTER_ENCRYPTION_KEY` | — | **required** — encrypts provider tokens and other secrets at rest; changing it makes stored credentials unreadable |
+| `CAIRN_AUTH_SESSION_TTL` | `720h` | absolute session lifetime (30 days) |
+| `CAIRN_AUTH_SESSION_IDLE_MAX` | `168h` | a session unused for this long expires (7 days) |
+| `CAIRN_AUTH_ARGON2_TIME` / `..._MEMORY` / `..._THREADS` / `..._KEY_LEN` | `2` / `19456` / `1` / `32` | Argon2id parameters for password hashing (memory in KiB) |
+| `CAIRN_AUTH_OAUTH_ENABLED` | `true` | Cairn's own OAuth 2.1 authorization server, used by native apps and [MCP](/integrations/mcp) |
+| `CAIRN_AUTH_OAUTH_ACCESS_TOKEN_TTL` | `1h` | |
+| `CAIRN_AUTH_OAUTH_REFRESH_TOKEN_TTL` | `2160h` | 90 days |
+| `CAIRN_AUTH_OAUTH_AUTH_CODE_TTL` | `5m` | |
+| `CAIRN_AUTH_OAUTH_ALLOW_DYNAMIC_REGISTRATION` | `true` | let clients register themselves (RFC 7591); see [OAuth](/integrations/oauth) |
+| `CAIRN_AUTH_OAUTH_DEVICE_CODE_TTL` | `10m` | lifetime of a device authorization code pair (RFC 8628), see [Device sign-in](/integrations/oauth#device-authorization) |
+| `CAIRN_AUTH_OAUTH_DEVICE_POLL_INTERVAL` | `5s` | minimum interval a device may poll the token endpoint; faster polling is answered with `slow_down` |
+
+## Sign-in with an identity provider (OIDC)
+
+Besides passwords and passkeys, users can sign in through any OpenID Connect
+provider. List the provider ids, then configure each one under its own prefix.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_OIDC_PROVIDERS` | — | comma-separated ids, e.g. `pocketid,google` — each id becomes a login button |
+| `CAIRN_OIDC_<ID>_ISSUER_URL` | — | **required per provider** — the OIDC issuer |
+| `CAIRN_OIDC_<ID>_CLIENT_ID` / `..._CLIENT_SECRET` | — | **required per provider** — confidential client |
+| `CAIRN_OIDC_<ID>_NAME` | the id | label of the login button |
+| `CAIRN_OIDC_<ID>_SCOPES` | `openid,email,profile` | |
+| `CAIRN_OIDC_<ID>_AUDIENCE` | the client id | expected `aud` claim |
+| `CAIRN_OIDC_<ID>_SKIP_AUDIENCE_CHECK` | `false` | |
+| `CAIRN_OIDC_<ID>_USE_PKCE` | `true` | |
+| `CAIRN_OIDC_<ID>_AUTO_PROVISION` | `true` | create an account on first sign-in |
+| `CAIRN_OIDC_<ID>_AUTO_PROVISION_ROLE` | `user` | `user` or `admin` for auto-provisioned accounts |
+
+`<ID>` is the upper-cased provider id: `CAIRN_OIDC_PROVIDERS=google` reads
+`CAIRN_OIDC_GOOGLE_ISSUER_URL`.
+
+## Instance
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_INSTANCE_PUBLIC_URL` | `http://localhost:8080` | the instance's canonical URL as presented to other instances and in emails |
+| `CAIRN_INSTANCE_BOOTSTRAP_ADMIN_EMAIL` / `..._PASSWORD` | — | creates the first admin on first boot; harmless to leave set afterwards. The admin is asked for a new password at the first password sign-in, like every account whose password an administrator set |
+| `CAIRN_INSTANCE_TRUSTED_PROXIES` | — | comma-separated CIDRs whose `X-Forwarded-*` headers are honored |
+
+## NATS (control plane)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | set it to an empty value to run without NATS: no workers, no scheduler |
+| `CAIRN_NATS_CLUSTER_NAME` | — | optional guard against pointing at the wrong cluster |
+| `CAIRN_NATS_CLIENT_NAME` | `cairn-server` | connection name shown in NATS monitoring |
+| `CAIRN_NATS_CREDS_FILE` / `..._USERNAME` / `..._PASSWORD` | — | credentials (prod: nkey/JWT creds file) |
+| `CAIRN_NATS_TLS_CA_FILE` / `..._TLS_CERT_FILE` / `..._TLS_KEY_FILE` | — | TLS to the NATS server |
+| `CAIRN_NATS_CONNECT_TIMEOUT` / `..._RECONNECT_WAIT` / `..._MAX_RECONNECTS` | `10s` / `2s` / `-1` | `-1` reconnects forever |
+| `CAIRN_NATS_JOB_ACK_WAIT` | `5m` | ack window of the consumers core creates on `CAIRN_RESULTS`; also the TTL of the credentials auth-callout issues to workers. Job consumers are created by the workers with their own AckWait (Strava worker 2 min, Garmin worker 30 s), see the [provider contract](/architecture/provider-contract) |
+| `CAIRN_NATS_JOB_MAX_DELIVER` | `5` | redeliveries before a job lands in the dead-letter stream |
+| `CAIRN_NATS_AUTH_CALLOUT` | `false` | answer NATS auth-callout requests and admit enrolled workers, see [NATS auth-callout](/self-host/providers#nats-auth-callout) |
+| `CAIRN_NATS_WORKER_ACCOUNT` | — | the nats.conf account admitted workers join, the one core connects to (e.g. `CAIRN`); required when `CAIRN_NATS_AUTH_CALLOUT=true` |
+
+## Storage (S3-compatible, optional)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_STORAGE_ENDPOINT` | `http://minio:9000` | |
+| `CAIRN_STORAGE_REGION` | `us-east-1` | |
+| `CAIRN_STORAGE_BUCKET` | `cairn` | |
+| `CAIRN_STORAGE_ACCESS_KEY_ID` / `..._SECRET_ACCESS_KEY` | — | when both are empty, core runs without blob storage: no raw-file uploads, no photos, no cached map snapshots |
+| `CAIRN_STORAGE_USE_PATH_STYLE` | `true` | path-style addressing (MinIO, Garage); `false` for virtual-hosted buckets |
+| `CAIRN_STORAGE_PRESIGN_TTL` | `15m` | lifetime of the presigned upload and download URLs handed to clients and workers |
+| `CAIRN_STORAGE_PUBLIC_ENDPOINT` | — | object-store origin that browsers and native apps can reach, used only to presign the URLs handed to them; `CAIRN_STORAGE_ENDPOINT` stays the internal address core and the workers use. Unset, core serves photos, uploads and exports itself through signed `/content/{token}` URLs (HMAC claims, 15 minutes), which works on every deployment |
+| `CAIRN_STORAGE_TRANSFER_EXPIRY_DAYS` | `1` | bucket lifecycle rule for claim-checked worker results under `transfer/`; core deletes them right after ingest, the rule only reaps orphans |
+
+## Maps
+
+The interactive map in the web UI uses OpenFreeMap's key-less Liberty vector
+style by default. The server renders a static snapshot of every activity
+(`/api/activities/{id}/map.png`) for feeds and share links from raster tiles.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_MAP_TILE_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | raster tile template for the server-rendered snapshot |
+| `CAIRN_MAP_USER_AGENT` | — | identifies your instance to the tile provider; the public OSM tile server requires a meaningful value, see its usage policy |
+| `CAIRN_MAP_TIMEOUT` | `15s` | per-tile fetch timeout |
+| `VITE_MAP_STYLE_URL` | OpenFreeMap Liberty | **build-time** variable of the web UI, not read by the server: point it at your own MapLibre style JSON when you build the image yourself |
+
+## Geocoder
+
+Activities get a place name from reverse geocoding their start point.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_GEOCODER_ENABLED` | `true` | |
+| `CAIRN_GEOCODER_URL` | `https://nominatim.openstreetmap.org` | any Nominatim-compatible endpoint |
+| `CAIRN_GEOCODER_EMAIL` / `..._USER_AGENT` | — | contact details Nominatim asks for; set them before using the public instance |
+| `CAIRN_GEOCODER_MIN_INTERVAL` | `1s` | minimum spacing between requests (the public instance allows one per second) |
+| `CAIRN_GEOCODER_TIMEOUT` | `10s` | |
+| `CAIRN_GEOCODER_BATCH_SIZE` / `..._TICK_INTERVAL` | `50` / `2m` | how many activities are geocoded per tick |
+
+## Email
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_EMAIL_ADAPTER` | `none` | `none`, `smtp`, `ses`, `resend` or `mailgun`; `none` disables verification and reset mails |
+| `CAIRN_EMAIL_FROM_ADDRESS` / `..._FROM_NAME` | — / `Cairn` | |
+| `CAIRN_EMAIL_SMTP_HOST` / `..._SMTP_PORT` | — / `587` | |
+| `CAIRN_EMAIL_SMTP_USERNAME` / `..._SMTP_PASSWORD` | — | |
+| `CAIRN_EMAIL_SMTP_STARTTLS` | `true` | |
+| `CAIRN_EMAIL_SES_REGION` | — | for the `ses` adapter |
+| `CAIRN_EMAIL_API_KEY` | — | for `resend` and `mailgun` |
+| `CAIRN_EMAIL_MAILGUN_DOMAIN` | — | |
+
+## Scheduler
+
+The scheduler drives periodic provider reconciles and webhook drift checks.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_SCHEDULER_ENABLED` | `true` | disable on all but one replica if you scale core |
+| `CAIRN_SCHEDULER_TICK_INTERVAL` | `60s` | |
+| `CAIRN_SCHEDULER_POLLING_INTERVAL` | `60m` | how often each connected account is reconciled |
+| `CAIRN_SCHEDULER_WEBHOOK_DRIFT_INTERVAL` | `24h` | re-checks provider webhook subscriptions |
+| `CAIRN_SCHEDULER_BATCH_SIZE` | `100` | accounts per tick |
+
+## Federation
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_FEDERATION_ENABLED` | `false` | ActivityPub federation. Off keeps federation fully dormant: no remote activities in feeds and no "Federated" feed filter. See [Social & federation](/using-cairn/social) |
+| `CAIRN_FEDERATION_ALLOW_PRIVATE_HOSTS` | `false` | lift the [outbound address guard](#outbound-requests) for federation fetches and deliveries, so instances on private or loopback addresses can reach each other — only for local testing |
+
+## Quotas and logging
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_QUOTA_MAX_ACTIVITIES_PER_USER` | `0` | `0` means unlimited |
+| `CAIRN_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
+| `CAIRN_LOG_FORMAT` | `json` | `json` or `text` |
+
+## Request limits
+
+These limits are fixed in the server, not configurable:
+
+| Request | Limit | Over the limit |
+| --- | --- | --- |
+| Connect-RPC message (web UI, gRPC, gRPC-Web clients) | 4 MiB per message | rejected by Connect (`resource_exhausted`) |
+| File upload, `POST /api/activities/upload` | 64 MiB file, plus 1 MiB multipart framing | `400` |
+| Attachment, `POST /api/activities/{id}/attachments` | 32 MiB file, plus 1 MiB framing and caption | `400` |
+| JSON request bodies of the REST API and MCP requests | 1 MiB | `400` |
+| Provider webhook deliveries, `POST /webhooks/{provider}` | 1 MiB | `413` |
+
+A body over the limit is refused, not truncated.
+
+## Outbound requests
+
+Federation fetches and deliveries and notification webhooks go through an
+address guard that refuses to connect to anything that is not public unicast:
+loopback, private (RFC 1918, `fc00::/7`), link-local and every other IANA
+special-purpose range, among them CGNAT `100.64.0.0/10` (including the
+`100.100.100.200` cloud metadata endpoint), `0.0.0.0/8`, `192.0.0.0/24`, the
+documentation and benchmarking ranges, `240.0.0.0/4`, NAT64 (`64:ff9b::/96`,
+`64:ff9b:1::/48`), 6to4 `2002::/16`, Teredo (`2001::/23`) and any IPv6 address
+outside `2000::/3`. IPv4-mapped IPv6 addresses are judged as their IPv4
+address. The check runs on the resolved address at dial time, so DNS names
+that point inward are refused too, and a webhook URL is validated against the
+same guard when it is saved. Redirects are capped, and every hop is dialed
+through the same guard.
+
+`CAIRN_FEDERATION_ALLOW_PRIVATE_HOSTS=true` turns the guard off for federation
+only (and makes WebFinger lookups use plain HTTP); notification webhooks stay
+guarded.
+
+## Worker variables
+
+Provider workers are separate processes with their own, smaller set of
+`CAIRN_*` variables (NATS connection, enrollment, provider credentials). They
+are listed on the [Providers](/self-host/providers) page.

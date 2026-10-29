@@ -1,0 +1,9 @@
+{
+  "label": "Clients",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "Ways to use your Cairn instance besides the web UI."
+  },
+  "collapsed": false
+}

@@ -1,15 +1,55 @@
 ---
-id: providers
-title: Providers (Strava & Garmin)
-sidebar_position: 3
+id: index
+title: Providers
+sidebar_label: Overview
+sidebar_position: 1
 ---
 
 # Providers
 
-Each provider is a **separate worker process** in its own repository. Core never
-imports worker code — the contract is the proto messages + the NATS subjects
-(see [Provider workers](/architecture/workers)). You run only the workers you
-need.
+Each provider is a **separate worker process** in its own repository. Core
+never imports worker code: the contract is the proto messages plus the NATS
+subjects (see [Provider workers](/architecture/workers)). You run only the
+workers you need. Two providers ship today:
+
+- [Strava](/self-host/providers/strava), a Go worker. Users bring their own
+  Strava API app; imports arrive by polling and, optionally, push webhooks.
+- [Garmin](/self-host/providers/garmin), a Python worker. Users enter their
+  Garmin credentials; the worker imports activities, gear and daily health
+  metrics.
+
+This page covers what is common to every provider: how a worker fits into
+core, how it is enrolled and authenticated, and how workers and connections
+are managed.
+
+## How a provider fits in
+
+- **Workers and pools.** A worker runs under a name (`CAIRN_WORKER_NAME`,
+  for example `strava-fetcher`). All instances with that name form one
+  **pool**; they share one durable consumer per job subject, so adding an
+  instance adds throughput. Jobs, discovery requests and results travel on
+  per-pool NATS subjects, `cairn.jobs.<job>.<provider>.<name>` and friends.
+  Several pools can serve one provider, for example two Strava workers of
+  different versions.
+- **Connections.** A user links a provider account on the **Connections**
+  page. Each connection belongs to one pool; when a provider has several,
+  the user picks one and can move the connection later. The page shows the
+  sync status of every account: imported and provider totals, the
+  watermark, rate budgets, queue counts, and whether sources are out of
+  date.
+- **Sync.** The scheduler reconciles every connected account on
+  `CAIRN_SCHEDULER_POLLING_INTERVAL`; the user can also start a full sync
+  (with a preview of what it would fetch), sync gear, toggle auto import,
+  set a poll interval and a label, and re-parse out-of-date sources from
+  the archive without spending provider quota. Provider webhooks arrive at
+  core (`POST /webhooks/{provider}`) and are forwarded to the pool over NATS.
+- **Versions.** Core publishes its release to the `cairn_core` KV bucket;
+  a worker refuses an incompatible core (same `major.minor` before 1.0).
+  Each source records the parser version that produced it; a newer parser in
+  the pool flags the source "newer parser available" on the Connections and
+  Manage pages.
+- **Rate limits.** Budgets are tracked per provider app and shown per
+  connection, so one user's backfill cannot starve another's app.
 
 ## Enrollment
 
@@ -132,88 +172,28 @@ auth-callout; under the auth-callout add that user to the `CAIRN` account and
 to `auth_users`. Grant it the [permissions](#nats-permissions) for its
 provider.
 
-## Strava (Go)
+## Managing workers
 
-Repo: **cairn-provider-strava**. Strava is read-only for Cairn. Each user brings
-their own Strava API app (per-user OAuth) for rate-limit isolation and webhook
-ownership; users connect their account from the **Connections** screen.
+Administrators see the fleet in the admin area and on `/api/admin/*`:
 
-```bash
-docker run --rm \
-  -e CAIRN_NATS_URL=nats://nats:4222 \
-  -e CAIRN_WORKER_NAME=strava-fetcher \
-  -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
-  ghcr.io/opencairn-org/cairn-provider-strava:v0.4.0
-```
-
-Only one Strava worker instance should own the webhook subject — set
-`CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` on exactly one.
-
-Since 0.4.0 the worker imports [gear](/using-cairn/gear): every fetched
-activity carries its Strava gear, and `import_gear` lists the athlete's bikes
-and shoes with brand and model (one `GET /gear/{id}` per item). Archived
-activities carry the gear summary, so a reparse backfills gear on older
-imports without API calls.
-
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` for authenticated servers |
-| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | one-time enrollment token from `POST /api/admin/worker-enrollments` |
-| `CAIRN_WORKER_NAME` | `strava-fetcher` | must equal the enrollment's `name` |
-| `CAIRN_WORKER_INSTANCE_ID` | the hostname | stable id when you run several instances |
-| `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` | — | set on exactly one instance |
-| `CAIRN_STRAVA_TOKEN_URL` | Strava's | override for testing against a mock |
-| `CAIRN_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
-
-## Garmin (Python)
-
-Repo: **cairn-provider-garmin**. Garmin has no public activity OAuth API, so the
-worker uses the `garminconnect` library (Garth SSO). Per-user credentials are
-delivered over NATS. Like the Strava worker it enrolls with
-`CAIRN_WORKER_ENROLLMENT_TOKEN` (v0.3.1 or later); without a token it connects
-with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` when set, otherwise anonymously.
-
-```bash
-docker run --rm \
-  -e CAIRN_NATS_URL=nats://nats:4222 \
-  -e CAIRN_WORKER_NAME=garmin-fetcher \
-  -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
-  -v garmin-tokens:/data \
-  ghcr.io/opencairn-org/cairn-provider-garmin:v0.4.0
-```
-
-Since 0.4.0 the worker imports [gear](/using-cairn/gear): `import_gear`
-lists the account's gear with Garmin's per-sport defaults, and each fetched
-activity looks up the gear recorded on it (one extra Garmin call per
-activity; `CAIRN_GARMIN_FETCH_ACTIVITY_GEAR=false` switches that off for
-accounts that hit Garmin's limits). Archived responses carry no gear, so
-activities imported before 0.4.0 need a reimport to get it.
-
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` are used when set and no enrollment token is |
-| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | enrollment token from `POST /api/admin/worker-enrollments` (provider `garmin`); takes precedence over user/password |
-| `CAIRN_WORKER_NAME` | `garmin-fetcher` | must equal the enrollment's `name`; shared by every instance of the worker |
-| `CAIRN_WORKER_INSTANCE_ID` | random 12-hex id | unique per instance; in Kubernetes set it to the pod name so a restart reuses its presence key |
-| `CAIRN_HEARTBEAT_INTERVAL_S` | `20` | presence heartbeat to the `cairn_worker_presence` KV |
-| `CAIRN_PULL_BATCH` | `4` | jobs pulled per fetch |
-| `CAIRN_GARTH_HOME` | `/data/garth` in the image, `~/.cache/cairn-garth` outside it | Garth token store, one subdirectory per account; keeps the Garmin session between jobs. Mount a volume on `/data` so MFA accounts are not re-prompted on every restart |
-| `CAIRN_GARMIN_EMAIL` / `..._PASSWORD` | — | **dev fallback only** — in production each user's credentials are delivered over NATS |
-| `CAIRN_GARMIN_FETCH_ACTIVITY_GEAR` | `true` | look up the gear recorded on each fetched activity (one extra call per activity) |
-| `CAIRN_PROTO_PATH` | `/opt/cairn-proto` in the image, `<repo>/proto` outside it | location of the committed proto stubs |
-
-The image runs as the unprivileged user `cairn` (uid/gid 10001) and declares
-`/data` as a volume. The token directory must be readable and writable by that
-uid: a fresh named volume or an `emptyDir` already is; a volume or bind mount
-written by an image before 0.2.3 (which ran as root) needs
-`chown -R 10001:10001` once, and in Kubernetes a persistent volume needs
-`securityContext.fsGroup: 10001` on the pod. Without it the worker cannot read
-or write cached tokens and logs in to Garmin on every job.
-
-The worker cannot answer an MFA prompt. For MFA accounts, seed the token store
-once with an interactive login as described in the
-[worker README](https://github.com/opencairn-org/cairn-provider-garmin#mfa-accounts),
-then mount it.
+- **Workers** (`GET /api/admin/workers`): every live instance with its
+  presence heartbeat, release and manifest (the data types and jobs it
+  declares). A manifest newer than what a source was parsed with is what
+  flags the source for re-parse.
+- **Pools** (`GET /api/admin/worker-pools`): registered pools per provider,
+  the package bound to each name, and **retire** for a pool that is gone for
+  good (`POST /api/admin/worker-pools/{provider}/{name}/retire`).
+- **Enrollments** (`GET /api/admin/worker-enrollments`): revoke and prolong,
+  see [Enrollment](#enrollment).
+- **Health** (`GET /api/admin/health`) grades the fleet: live instances with
+  a compatible release are healthy, an incompatible release is degraded, a
+  registered pool without a live instance is offline. The admin event stream
+  reports workers registering, going offline, deregistering or becoming
+  degraded, and dead-lettered jobs, see
+  [Administration](/self-host/administration#health-and-observability).
+- **Import queue and dead letters** (`/api/admin/jobs`, `/api/admin/dlq`):
+  retry, cancel and replay, see
+  [Administration](/self-host/administration#imports-and-workers).
 
 ## NATS permissions
 
@@ -223,7 +203,7 @@ worker key `<wk>` = `<n>-<p>` (for example `strava-fetcher-strava`). It allows:
 
 | | Subjects |
 | --- | --- |
-| Subscribe | `cairn.jobs.{fetch_source,parse_blob,backfill,reconcile,import_metrics,import_gear}.<p>.<n>` (its pool; the same without `.<n>` through 0.5 to drain old jobs), `cairn.cmd.worker.<wk>.>`, `cairn.discover.<p>.<n>` (serving discover requests), `cairn.webhooks.<wk>.event`, `cairn.webhooks.<wk>.verify`, `_INBOX.>` |
+| Subscribe | `cairn.jobs.{fetch_source,parse_blob,backfill,reconcile,import_metrics,import_gear}.<p>.<n>` (its pool, plus the pre-0.5 subjects without `.<n>` so an upgraded pool drains jobs queued before the upgrade; still granted in 0.6.0), `cairn.cmd.worker.<wk>.>`, `cairn.discover.<p>.<n>` (serving discover requests), `cairn.webhooks.<wk>.event`, `cairn.webhooks.<wk>.verify`, `_INBOX.>` |
 | Publish | `cairn.results.{fetch_source,parse_blob,backfill,import_metrics,import_gear}.<p>.<n>`, `cairn.results.reconcile.<p>.<n>.*` (account-suffixed), `cairn.accounts.lookup.<p>.<n>`, `cairn.jobs.fetch_source.<p>.<n>` (sub-jobs from reconcile and webhooks), `cairn.workers.<wk>.>`, `cairn.tokens.<p>.>`, `cairn.creds.<p>.get`, `cairn.blobs.presign_upload.<p>`, `cairn.blobs.presign_download.<p>`, `_INBOX.>` |
 | JetStream API | `$JS.API.STREAM.NAMES` (stream lookup by subject); consumer create on `CAIRN_JOBS` filtered to the job subjects above and on `CAIRN_WEBHOOKS` filtered to `cairn.webhooks.<wk>.event`, plus `$JS.API.CONSUMER.DURABLE.CREATE.CAIRN_JOBS.*`; consumer info, `MSG.NEXT` and `$JS.ACK.<stream>.>` on both streams; stream info, direct get, message get and `$KV.<bucket>.>` on the `cairn_worker_presence`, `cairn_worker_manifests` and `cairn_rate_limits` KV buckets; stream info and gets (read-only) on `cairn_core`, which holds core's release |
 

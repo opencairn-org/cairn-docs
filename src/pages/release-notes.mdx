@@ -1,0 +1,266 @@
+---
+title: Release notes
+description: What each Cairn release changed, across core and the provider workers.
+---
+
+# Release notes
+
+One entry per core release, newest first, with the worker releases that
+belong to it. Each entry links to the documentation frozen for that release
+and to the full changelogs on GitHub. Upgrade steps live on the
+[Self-host overview](/self-host/overview) of each version.
+
+Since 0.3.0 core and both workers are tagged together. The worker contract
+(`cairn.worker.v1`) changes only with a core minor; a worker needs the same
+`major.minor` as core before 1.0.
+
+## 0.6.0
+
+**2026-10-29** · **Components:** cairn-core v0.6.0 · cairn-provider-strava v0.6.0 ·
+cairn-provider-garmin v0.6.0 · [documentation](/)
+
+**Upgrade:** no worker upgrade required, the contract is unchanged since
+0.5.0. Migrations 00067–00073 run on start. Passwords set by an administrator
+must be changed at the next sign-in. See
+[Upgrading to 0.6.0](/self-host/overview#upgrading-to-060).
+
+- Connect-RPC is a full twin of REST: every `/api/*` route has an RPC on the
+  same use case, including admin, social, stats, metrics, segments and
+  external accounts, plus live streams for activity events, notifications
+  and admin events. Cleartext HTTP/2 (h2c) for native clients.
+- OAuth: complete scope catalog with per-family enforcement on Connect, the
+  device authorization grant (RFC 8628) with an approval page, loopback
+  redirects per RFC 8252, authorized apps in Settings.
+- Account security: passkey as a second factor, sign-in lockout with audit
+  entries, forced change of admin-set passwords, session and identity
+  management, password change ends other sessions.
+- Native segments with private or instance scope, tolerances, backfill and
+  leaderboards; custom best-effort windows.
+- Metric store: query, series and bulk upsert for health, body, performance
+  and wellness measurements; reimport previews with a field-level diff;
+  soft-delete of activities; removal of an external account.
+- Photos get thumbnail, medium and blurhash variants; photos, snapshots and
+  exports are served through short-lived signed URLs.
+- Administration: persisted maintenance operations (segment rematch,
+  best-effort, merge and training-load recomputes, purge, blob garbage
+  collection), admin event stream for the whole event enum, audit log.
+- Workers: GitHub releases are published from the tag with SBOM; no code
+  changes.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.6.0/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.6.0/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.6.0/CHANGELOG.md)
+
+## 0.5.1
+
+**2026-10-25** · **Components:** cairn-core v0.5.1 · workers stay on 0.5.0 ·
+[documentation](/0.5.1/)
+
+Core-only patch: "Re-download all" on a full sync again re-fetches
+activities an earlier sync had imported, so the Garmin gear backfill after
+0.5.0 runs.
+
+Changelog: [core](https://github.com/opencairn-org/cairn-core/blob/v0.5.1/CHANGELOG.md)
+
+## 0.5.0
+
+**2026-10-25** · **Components:** cairn-core v0.5.0 · cairn-provider-strava v0.5.0 ·
+cairn-provider-garmin v0.5.0 · [documentation](/0.5.0/)
+
+**Upgrade:** core first, then both workers; a 0.4 worker keeps running but
+receives no jobs. Migrations 00064–00066. See
+[Upgrading to 0.5.0](/0.5.0/self-host/overview#upgrading-to-050).
+
+- Worker pools: jobs, discovery, results and lookups per
+  `provider.worker_name`; one connection per pool per account; merge
+  priorities may name a pool.
+- Provider versioning: parser version `N.M` per source, "newer parser
+  available" flags with a bulk re-parse that costs no provider quota, release
+  compatibility check between core and workers.
+- Rate budgets per provider app, pending gear decisions directly from an
+  activity, a shared header on the activity pages.
+- Strava worker: parser 1.1, per-app rate buckets, non-429 4xx responses fail
+  the job instead of retrying forever. Garmin worker: parser 1.2 with the
+  archive holding every parser input, gear from the archive.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.5.0/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.5.0/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.5.0/CHANGELOG.md)
+
+## 0.4.0
+
+**2026-10-21** · **Components:** cairn-core v0.4.0 · cairn-provider-strava v0.4.0 ·
+cairn-provider-garmin v0.4.0 · [documentation](/0.4.0/)
+
+**Upgrade:** core before the workers; from here on job results ignore
+unknown fields. Migration 00063. See
+[Upgrading to 0.4.0](/0.4.0/self-host/overview#upgrading-to-040).
+
+- Gear as a first-class entity: bikes and shoes with provider records mapped
+  onto them, defaults per sport, totals, a Gear page, pending decisions for
+  unknown provider gear, `gear` as a merge field group.
+- Worker contract gains gear events and the `import_gear` job. Both workers
+  import gear; Strava archives carry it (reparse), Garmin needs a reimport.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.4.0/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.4.0/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.4.0/CHANGELOG.md)
+
+## 0.3.3
+
+**2026-10-19** · **Components:** cairn-core v0.3.3 · cairn-provider-strava v0.3.2 ·
+cairn-provider-garmin v0.3.2 · [documentation](/0.3.3/)
+
+- The project moved to the `opencairn-org` GitHub organization. Images are
+  published as `ghcr.io/opencairn-org/*`; the `ghcr.io/johnnycube` namespace
+  is a frozen mirror. Move image pins and Renovate rules.
+- `buf breaking` against the previous tag guards the proto contract; the
+  workers add mutation testing, a code of conduct and ADR logs.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.3.3/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.3.2/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.3.2/CHANGELOG.md)
+
+## 0.3.2
+
+**2026-10-15** · **Components:** cairn-core v0.3.2 · [documentation](/0.3.2/)
+
+- Worker enrollments accept any well-formed provider type, so a worker for a
+  provider core does not ship can be enrolled without a core change.
+
+Changelog: [core](https://github.com/opencairn-org/cairn-core/blob/v0.3.2/CHANGELOG.md)
+
+## 0.3.1
+
+**2026-10-15** · **Components:** cairn-core v0.3.1 · cairn-provider-strava v0.3.1 ·
+cairn-provider-garmin v0.3.1 · [documentation](/0.3.1/)
+
+**Upgrade:** enrollments created before 0.3.1 carry no provider and must be
+re-created. See
+[Upgrading to 0.3.1](/0.3.1/self-host/overview#upgrading-to-031).
+
+- Worker enrollment under NATS auth-callout works for the first time; it is
+  opt-in with `CAIRN_NATS_AUTH_CALLOUT` and `CAIRN_NATS_WORKER_ACCOUNT`.
+  Security: enrollments without a provider are refused, since their
+  credentials would have been unrestricted.
+- Both workers present only the enrollment token on CONNECT; the Garmin
+  worker gains enrollment-token auth.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.3.1/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.3.1/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.3.1/CHANGELOG.md)
+
+## 0.3.0
+
+**2026-10-15** · **Components:** cairn-core v0.3.0 · cairn-provider-strava v0.3.0 ·
+cairn-provider-garmin v0.3.0 · [documentation](/0.3.0/)
+
+**Upgrade (breaking):** configuration is read only from `CAIRN_`-prefixed
+variables, and an empty required variable fails startup. See
+[Upgrading to 0.3.0](/0.3.0/self-host/overview#upgrading-to-030).
+
+- connect-go v2 and SvelteKit 3; Connect messages capped at 4 MiB; request
+  bodies capped on uploads and attachments.
+- `cairn config help`; the SSRF guard covers every IANA special-purpose
+  range; login redirects reject backslashes and control characters.
+- Worker permission template matches the contract, so enrolled workers can
+  pull jobs; publishes outside a JetStream stream no longer wait for an ack.
+- CI onboarded to fleetlint with a single `make check` gate in every repo,
+  pinned actions and base images, CodeQL and weekly mutation runs.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.3.0/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.3.0/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.3.0/CHANGELOG.md)
+
+## 0.2.6
+
+**2026-09-29** · **Components:** cairn-core v0.2.6 · cairn-provider-strava v0.2.5 ·
+cairn-provider-garmin v0.2.2 · [documentation](/0.2.6/)
+
+- Malformed JSON bodies are rejected with `400`; `CAIRN_NATS_STREAM_RETENTION_DAYS`
+  is removed (nothing read it). Silent error paths now log.
+- Privacy and sharing settings no longer save an empty policy after a failed
+  load.
+- Garmin 0.2.2 fixes token persistence after a fresh login (every job used to
+  sign in again) and propagates authentication failures of health calls.
+  Garmin 0.2.3 (2026-10-15) runs as uid 10001 instead of root, locks
+  dependencies with uv, and defaults the dev token store to
+  `~/.cache/cairn-garth`. Strava 0.2.6 (2026-10-15) fixes the publish
+  timeout and a tight retry loop in the webhook event loop.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.2.6/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.2.6/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.2.3/CHANGELOG.md)
+
+## 0.2.5
+
+**2026-09-11** · **Components:** cairn-core v0.2.5 · cairn-provider-strava v0.2.3–0.2.4 ·
+cairn-provider-garmin v0.2.1 · [documentation](/0.2.5/)
+
+- Heatmap of every GPS track the filter matches; the filter bar is shared by
+  the activities list and the heatmap; "Regenerate map snapshot" on the
+  manage page.
+- Federation off means fully dormant; the public
+  `GET /api/instance/features` tells clients.
+- Interactive maps were blank in production builds since 0.2.4 (MapLibre
+  worker path); fixed.
+- Worker images are signed keyless with cosign and ship SLSA provenance and
+  SBOM attestations. Strava 0.2.4 honours `CAIRN_LOG_LEVEL` and drops adapter
+  code it never used.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.2.5/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.2.4/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.2.1/CHANGELOG.md)
+
+## 0.2.4
+
+**2026-08-28** · **Components:** cairn-core v0.2.4 · [documentation](/0.2.4/)
+
+- Export options strip GPS, altitude, heart rate, power and other channels
+  from GPX, TCX and FIT exports.
+- Maps: the interactive map defaults to OpenFreeMap's key-less Liberty style
+  after CARTO started watermarking its tiles; the server-rendered snapshot
+  fetches from `CAIRN_MAP_TILE_URL`.
+- Scheduled reconcile no longer re-imports the newest activity of every
+  account on each tick.
+
+Changelog: [core](https://github.com/opencairn-org/cairn-core/blob/v0.2.4/CHANGELOG.md)
+
+## 0.2.3
+
+**2026-07-29** · **Components:** cairn-core v0.2.3 · [documentation](/0.2.3/)
+
+- Year facet and paging on the activities page; images are signed with
+  cosign and published with provenance and SBOM.
+
+Changelog: [core](https://github.com/opencairn-org/cairn-core/blob/v0.2.3/CHANGELOG.md)
+
+## 0.2.1 and 0.2.2
+
+**2026-07-20** · **Components:** cairn-core v0.2.1–0.2.2 · cairn-provider-strava v0.2.1–0.2.2
+
+- NATS JetStream binds an explicit StorageClass in the Kubernetes manifest;
+  without it the claim stayed pending and JetStream state was lost on every
+  reschedule.
+- Stale worker manifests are reaped; the Strava worker re-publishes its
+  manifest every five minutes.
+- 0.2.2 only republishes the images the 0.2.1 pipeline failed to produce.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.2.2/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.2.2/CHANGELOG.md)
+
+## 0.2.0
+
+**2026-07-16** · **Components:** cairn-core v0.2.0 · cairn-provider-strava v0.2.0 ·
+cairn-provider-garmin v0.2.0 · [documentation](/0.2.0/)
+
+**First public release.** Import from Strava, Garmin, file upload and manual
+entry through one ingest path; per-field-group merge with a user policy;
+best efforts, segments, training load, exports; the SvelteKit web UI; a
+social layer with follows, profiles, share links, kudos, comments, clubs and
+moderation; optional ActivityPub federation; notifications by email and
+webhook; a single distroless image plus worker images.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.2.0/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.2.0/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.2.0/CHANGELOG.md)

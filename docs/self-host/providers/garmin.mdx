@@ -1,0 +1,88 @@
+---
+id: garmin
+title: Garmin
+sidebar_position: 3
+---
+
+# Garmin
+
+Repo: **cairn-provider-garmin** (Python). Garmin has no public activity OAuth
+API, so the worker signs in to Garmin Connect with the user's credentials
+through the `garminconnect` library (Garth SSO). It imports activities,
+[gear](/using-cairn/gear) and the daily health series shown on the
+[Health page](/using-cairn/metrics#daily-health): HRV, sleep, weight, steps
+and resting heart rate.
+
+## For users: connect a Garmin account
+
+On **Connections**, add a Garmin connection and enter the Garmin Connect
+email and password. Core stores them encrypted with the master key and
+delivers them to the worker over NATS when a job needs them; they never sit
+in the worker's configuration. Accounts protected with **MFA** need a one-off
+interactive login by the operator, see [MFA accounts](#mfa-accounts).
+
+## Running the worker
+
+The worker needs NATS and a volume for its token store:
+
+```bash
+docker run --rm \
+  -e CAIRN_NATS_URL=nats://nats:4222 \
+  -e CAIRN_WORKER_NAME=garmin-fetcher \
+  -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
+  -v garmin-tokens:/data \
+  ghcr.io/opencairn-org/cairn-provider-garmin:v0.6.0
+```
+
+The enrollment token comes from an admin, see
+[Enrollment](/self-host/providers#enrollment); without a token the worker
+connects with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` when set, otherwise
+anonymously. The [Docker Compose](/self-host/docker) configurator and the
+[Kubernetes](/self-host/kubernetes) bundle include the worker and its volume.
+
+## Token store
+
+The image runs as the unprivileged user `cairn` (uid/gid 10001) and declares
+`/data` as a volume. The token directory must be readable and writable by that
+uid: a fresh named volume or an `emptyDir` already is; a volume or bind mount
+written by an image before 0.2.3 (which ran as root) needs
+`chown -R 10001:10001` once, and in Kubernetes a persistent volume needs
+`securityContext.fsGroup: 10001` on the pod. Without it the worker cannot read
+or write cached tokens and logs in to Garmin on every job.
+
+Replicas do not share the store: each instance keeps its own sessions, and
+a restarted instance without a persistent volume signs in again from the
+credentials delivered over NATS.
+
+## MFA accounts
+
+The worker cannot answer an MFA prompt. For an account with MFA, seed the
+token store once with an interactive login as described in the
+[worker README](https://github.com/opencairn-org/cairn-provider-garmin#mfa-accounts),
+then mount that store on `/data`. Keep the volume: without it the account is
+prompted again on every restart.
+
+
+## Gear
+
+Since 0.4.0 the worker imports gear: `import_gear` lists the account's gear
+with Garmin's per-sport defaults, and each fetched activity looks up the
+gear recorded on it (one extra Garmin call per activity;
+`CAIRN_GARMIN_FETCH_ACTIVITY_GEAR=false` switches that off for accounts that
+hit Garmin's limits). Archived responses carry no gear, so activities
+imported before 0.4.0 need a reimport to get it.
+
+## Configuration
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` are used when set and no enrollment token is |
+| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | enrollment token from `POST /api/admin/worker-enrollments` (provider `garmin`); takes precedence over user/password |
+| `CAIRN_WORKER_NAME` | `garmin-fetcher` | must equal the enrollment's `name`; shared by every instance of the worker |
+| `CAIRN_WORKER_INSTANCE_ID` | random 12-hex id | unique per instance; in Kubernetes set it to the pod name so a restart reuses its presence key |
+| `CAIRN_HEARTBEAT_INTERVAL_S` | `20` | presence heartbeat to the `cairn_worker_presence` KV |
+| `CAIRN_PULL_BATCH` | `4` | jobs pulled per fetch |
+| `CAIRN_GARTH_HOME` | `/data/garth` in the image, `~/.cache/cairn-garth` outside it | Garth token store, one subdirectory per account; keeps the Garmin session between jobs. Mount a volume on `/data` so MFA accounts are not re-prompted on every restart |
+| `CAIRN_GARMIN_EMAIL` / `..._PASSWORD` | — | **dev fallback only** — in production each user's credentials are delivered over NATS |
+| `CAIRN_GARMIN_FETCH_ACTIVITY_GEAR` | `true` | look up the gear recorded on each fetched activity (one extra call per activity) |
+| `CAIRN_PROTO_PATH` | `/opt/cairn-proto` in the image, `<repo>/proto` outside it | location of the committed proto stubs |

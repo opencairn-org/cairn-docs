@@ -25,9 +25,18 @@ adapter. The dependency rule is the one rule that keeps the codebase clean.
 
 ## Surfaces
 
-- **Connect-RPC + REST** — both are live and user-facing. The Connect server
-  is built on connect-go v2 and speaks the Connect, gRPC and gRPC-Web
-  protocols; each message is capped at 4 MiB.
+- **Connect-RPC + REST** — both are live and user-facing, and since 0.6.0
+  every REST route has a Connect twin on the same use cases, so the two
+  surfaces behave identically. The Connect server is built on connect-go v2
+  and speaks the Connect, gRPC and gRPC-Web protocols over HTTP/1.1 and
+  cleartext HTTP/2 (h2c); each message is capped at 4 MiB. Server streams
+  (`StreamActivityEvents`, `StreamNotifications`, `StreamAdminEvents`) carry
+  live events with a 30-second heartbeat. OAuth tokens are checked per scope
+  family on Connect, see [OAuth](/integrations/oauth#scopes).
+- **Signed content URLs** — photos, map snapshots and exports are fetched
+  with a plain GET from a short-lived URL: presigned on the object store when
+  `CAIRN_STORAGE_PUBLIC_ENDPOINT` is set, otherwise served by core itself
+  under `/content/{token}`.
 - **Web UI** — a SvelteKit 3 CSR SPA embedded into the prod binary.
 - **NATS + JetStream** — the async control plane between core and the workers.
 

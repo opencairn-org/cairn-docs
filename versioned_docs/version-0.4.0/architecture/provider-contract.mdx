@@ -78,7 +78,7 @@ to the subjects below:
 | `cairn.jobs.import_gear.<provider>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
 | `cairn.jobs.backfill.<provider>` | MAY | legacy full-history walk |
 
-:::warning Why "every subject" is a MUST
+:::warning[Why "every subject" is a MUST]
 `CAIRN_JOBS` is a work-queue stream — messages for a subject nobody consumes
 are retained forever. A worker without a reconcile consumer leaves the
 scheduler's reconcile jobs queued indefinitely and new activities are never

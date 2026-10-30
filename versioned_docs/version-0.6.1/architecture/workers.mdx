@@ -1,0 +1,58 @@
+---
+id: workers
+title: Provider workers
+sidebar_position: 3
+---
+
+# Provider workers
+
+A provider worker is a **standalone process in its own repository**. Core does
+not depend on any worker's code, and a worker does not depend on core's code.
+The entire contract between them is:
+
+1. **The proto messages** — `cairn.v1` (activities, segments, metrics…) and
+   `cairn.worker.v1` (`Job`, `JobResult`, `WorkerEvent`, `WorkerManifest`).
+2. **The NATS subjects** — see [the pipeline](/architecture/pipeline).
+
+This is why the workers can be in different languages: **cairn-provider-strava**
+is Go, **cairn-provider-garmin** is Python. Each commits its own generated proto
+stubs (Go `.pb.go` / Python `_pb2.py`) so it builds with no buf/toolchain
+dependency.
+
+## What a worker does
+
+- **Registers** via the enrollment-token flow (NATS auth-callout admits the
+  token and issues a user JWT scoped to the worker's provider).
+- **Consumes** its pool's jobs through durable pull consumers on the exact
+  `cairn.jobs.<job_type>.<provider>.<worker_name>` subjects (`fetch_source`,
+  `reconcile`, `parse_blob`, `import_metrics`, `import_gear`, `backfill`) and
+  serves `cairn.discover.<provider>.<worker_name>`. Instances sharing a
+  `worker_name` share the work; each connected account is assigned to one
+  pool.
+- **Fetches** from the provider's API (using per-user tokens or credentials
+  delivered over NATS: `cairn.tokens.<provider>.*`,
+  `cairn.creds.<provider>.get`).
+- **Publishes** `cairn.worker.v1.JobResult` with `WorkerEvent`s (imported
+  activities, laps, segment efforts, records, metrics).
+- **Heartbeats** its capability manifest (which data types it can read/backfill).
+
+## Write your own provider
+
+Pick a language with protobuf + NATS support, generate the `cairn.v1` +
+`cairn.worker.v1` stubs from the proto contract, implement the job loop, and
+declare a capability manifest. The Go (strava) and Python (garmin) workers are
+the two reference implementations — the Python one is the smaller, clearer
+template since it implements the loop from scratch.
+
+The normative checklist of everything a compliant worker MUST implement —
+required consumers, heartbeats, claim-checked results, failure envelopes,
+reconcile semantics — is the
+[provider contract](/architecture/provider-contract), verifiable mechanically
+with cairn-core's `worker-conformance` harness.
+
+:::info[Standalone by design]
+Each worker is a standalone repository with its own build and release cycle.
+The Go worker carries its own worker SDK and NATS client, the Python worker
+implements the loop directly; neither imports core. The contract is the wire
+format, not shared code.
+:::

@@ -257,8 +257,8 @@ export default function ComposeConfigurator({defaultRelease = 'v0.6.0'}) {
             value="none"
             current={o.storage}
             onChange={(v) => set({storage: v})}
-            label="None"
-            hint="no uploads, photos or cached map snapshots"
+            label="None (API-only)"
+            hint="provider sync dead-letters; no uploads, photos or map snapshots"
           />
         </fieldset>
 

@@ -1,0 +1,114 @@
+---
+id: administration
+title: Administration
+sidebar_position: 6
+---
+
+# Administration
+
+Everything an instance administrator does is available in the admin area of
+the web UI (`/admin`, with moderation and OIDC sub-pages), on REST under
+`/api/admin/*` and, since 0.6.0, as a full twin on Connect's
+`AdminService`. Admin calls need a cookie session or a personal access token
+of an admin account; OAuth tokens are refused.
+
+## Users and sign-in
+
+- **Users**: list, create (with an initial password or an invite), edit,
+  change role, suspend or reactivate, set a per-user activity quota, reset
+  the password, revoke every credential (sessions, tokens, passkeys), delete.
+- **Invites**: create, resend, revoke; a person redeems one at
+  `POST /auth/invite/redeem` or through `AuthService.Register`.
+- **Instance settings** (`/api/admin/instance/settings`): name,
+  description, URL, logo and primary colour, support email, default locale,
+  timezone and units, whether registration is open and whether it requires
+  an invite, allowed email domains, and per-user caps on storage and
+  external accounts. **Merge defaults** set the instance-wide merge policy
+  users start from.
+- **Passwords set by an administrator must be changed.** A reset, an
+  initial password or the bootstrap admin password works exactly once: the
+  next password sign-in asks for a new one before a session is issued.
+- **Sign-in guard.** Every failed password attempt is audited as
+  `auth.login_failed`. Ten failures for one account or twenty from one
+  address within ten minutes lock that key for ten minutes; the login page
+  says so (`too_many_attempts`) and an auth-flood admin event is raised.
+- **Audit log** (`GET /api/admin/audit`, `ListAuditEntries`): who did what,
+  from where, including admin actions on users and sign-in failures.
+
+## Health and observability
+
+- `GET /healthz` is cheap liveness; `GET /readyz` checks Postgres, NATS and
+  S3 and names the failing dependency in a `503`.
+- `GET /metrics` is an unauthenticated Prometheus scrape endpoint; keep it
+  off the public internet at the proxy.
+- `GET /api/admin/health` is the operator's health report: database, NATS,
+  object store, and the worker fleet graded as healthy (live instances with
+  a compatible release), degraded (incompatible release) or offline
+  (registered pool without a live instance).
+- **Admin events** (`AdminService.StreamAdminEvents`) push what needs
+  attention: worker registered, offline, deregistered or degraded, a provider
+  conflict (two sources of one provider kept apart by the recluster), a job
+  dead-lettered, a user created or suspended, an auth flood, and system
+  health leaving "healthy".
+- **Test email** (`POST /api/admin/email/test`) sends through the configured
+  adapter.
+
+## Imports and workers
+
+- **Import queue** (`/api/admin/jobs`): every queued, running and failed
+  job; retry or cancel one. **Dead letters** (`/api/admin/dlq`) are jobs
+  that exhausted `CAIRN_NATS_JOB_MAX_DELIVER`; replay them once the cause is
+  fixed.
+- **Orphaned sources** (`/api/admin/sources/orphaned`): sources whose
+  activity is gone.
+- **Worker fleet**: live instances (`/api/admin/workers`), pools and their
+  retirement (`/api/admin/worker-pools`), and enrollments, see
+  [Providers](/self-host/providers#enrollment).
+- **Webhook signing tokens** (`/api/admin/webhook-tokens`, bulk rotate):
+  the per-account secrets provider webhooks are signed with.
+- **NATS account key**: bootstrap and rotate the auth-callout issuer key
+  (`/api/admin/nats/bootstrap-account-key`, `.../rotate-account-key`), see
+  [NATS auth-callout](/self-host/providers#nats-auth-callout).
+- **Operator actions**: geocode backfill for activities without a place
+  name, and a rebuild of gear totals.
+
+## Moderation
+
+Reports from users land in `/api/admin/reports` and are resolved there; an
+activity can be hidden instance-wide (`POST /api/admin/activities/{id}/hide`);
+remote instances can be blocked for federation
+(`/api/admin/federation/blocks`). The review queue for the user's own
+incoming content is on the user side (`/api/review-queue`).
+
+## Maintenance operations
+
+Since 0.6.0 an administrator can run instance-wide recomputations without
+shell access (`POST /api/admin/maintenance`, `AdminService.TriggerMaintenance`):
+
+| Operation | Effect |
+| --- | --- |
+| `rematch_all_segments` | run segment matching over every activity |
+| `recompute_best_efforts` | recompute best efforts and records, including custom windows |
+| `recompute_activity_merges` | re-merge every activity from its sources |
+| `recompute_training_load` | re-derive TSS and the CTL/ATL/TSB curves |
+| `purge_soft_deleted` | remove activities soft-deleted more than 30 days ago for good |
+| `garbage_collect_blobs` | delete objects no source or attachment references any more, across `raw/`, `attachments/`, `uploads/`, `users/`, `shared/` and `transfer/`; objects younger than 24 hours are left alone |
+
+The request carries the operation and a `confirm_phrase`, the operation's
+name in upper case (`PURGE_SOFT_DELETED`). Jobs run one at a time, in
+process, and are persisted: a restart re-queues the ones still waiting and
+marks the one that was running as failed with "interrupted by server
+restart". `GET /api/admin/maintenance/jobs` lists the live registry merged
+with the history; `POST /api/admin/maintenance/jobs/{id}/cancel` stops one.
+
+## Command line
+
+The core image has no shell, but the binary has subcommands you run as a
+one-off container (`docker compose run --rm core …` or a Kubernetes Job):
+
+| Command | What |
+| --- | --- |
+| `cairn serve` | the server (the image default) |
+| `cairn migrate up` | apply pending migrations; core refuses to start against an older schema when `CAIRN_DATABASE_AUTO_MIGRATE` is off |
+| `cairn config help` | every variable the server reads, with type, default and whether it is required |
+| `cairn attachments backfill-variants [--batch 100]` | derive thumbnail, medium and blurhash for photos stored before 0.6.0 |

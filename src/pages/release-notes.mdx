@@ -14,10 +14,27 @@ Since 0.3.0 core and both workers are tagged together. The worker contract
 (`cairn.worker.v1`) changes only with a core minor; a worker needs the same
 `major.minor` as core before 1.0.
 
+## 0.6.1
+
+**2026-10-30** · **Components:** cairn-core v0.6.1 · workers stay on 0.6.0 ·
+[documentation](/)
+
+**Upgrade:** core now refuses to start without object storage credentials.
+Deployments from the Compose configurator or the Kubernetes bundle already
+set them. See [Upgrading to 0.6.1](/self-host/overview#upgrading-to-061).
+
+Core-only patch: object storage is required by default. Without it, every
+claim-checked worker result dead-lettered since 0.5.0 while core reported
+only an informational log line. `CAIRN_STORAGE_DRIVER=none` is the explicit
+opt-out for API-only or development instances, logged at Error and shown as
+Degraded in the health probe.
+
+Changelog: [core](https://github.com/opencairn-org/cairn-core/blob/v0.6.1/CHANGELOG.md)
+
 ## 0.6.0
 
 **2026-10-29** · **Components:** cairn-core v0.6.0 · cairn-provider-strava v0.6.0 ·
-cairn-provider-garmin v0.6.0 · [documentation](/)
+cairn-provider-garmin v0.6.0 · [documentation](/0.6.0/)
 
 **Upgrade:** no worker upgrade required, the contract is unchanged since
 0.5.0. Migrations 00067–00073 run on start. Passwords set by an administrator

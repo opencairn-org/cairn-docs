@@ -1,0 +1,77 @@
+---
+id: strava
+title: Strava
+sidebar_position: 2
+---
+
+# Strava
+
+Repo: **cairn-provider-strava** (Go). Strava is read-only for Cairn: nothing
+is written back. Each user brings their **own Strava API app** (per-user
+OAuth) for rate-limit isolation and webhook ownership, and connects their
+account from the **Connections** page.
+
+## For users: connect a Strava account
+
+1. Create an API application at
+   [strava.com/settings/api](https://www.strava.com/settings/api). The
+   **Authorization Callback Domain** must be the host of your Cairn
+   instance; the Connections page shows the exact callback URL to use.
+2. On **Connections**, add a Strava connection with the app's client ID and
+   client secret, pick the worker pool if the instance runs more than one,
+   and authorize with Strava.
+3. The worker backfills the history, then keeps the account in sync through
+   the scheduler and, when enabled, Strava's push webhooks.
+
+Rate budgets are tracked per Strava app, so one user's backfill does not
+slow down another's.
+
+## Running the worker
+
+The worker needs only NATS: no database or object-store credentials. The
+[Docker Compose](/self-host/docker) configurator and the
+[Kubernetes](/self-host/kubernetes) bundle include it; standalone:
+
+```bash
+docker run --rm \
+  -e CAIRN_NATS_URL=nats://nats:4222 \
+  -e CAIRN_WORKER_NAME=strava-fetcher \
+  -e CAIRN_WORKER_ENROLLMENT_TOKEN=... \
+  ghcr.io/opencairn-org/cairn-provider-strava:v0.6.0
+```
+
+The enrollment token comes from an admin, see
+[Enrollment](/self-host/providers#enrollment); without NATS auth the worker
+connects anonymously or with `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD`. The
+image runs as the unprivileged user `worker` (uid 10002) and has no state,
+so instances can be added and replaced freely.
+
+## Webhooks
+
+Strava can push new and changed activities instead of waiting for the next
+poll. Set `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` on **exactly one** worker
+instance: that instance owns the webhook subscription. Strava delivers to
+`https://<your instance>/webhooks/strava`, so the instance must be reachable
+from the internet; core forwards the event to the pool over NATS. To scale
+Strava, run the pull workers without the token and one webhook-owner
+replica beside them.
+
+## Gear
+
+Since 0.4.0 the worker imports [gear](/using-cairn/gear): every fetched
+activity carries its Strava gear, and `import_gear` lists the athlete's bikes
+and shoes with brand and model (one `GET /gear/{id}` per item). Archived
+activities carry the gear summary, so a reparse backfills gear on older
+imports without API calls.
+
+## Configuration
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CAIRN_NATS_URL` | `nats://localhost:4222` | `CAIRN_NATS_USER` / `CAIRN_NATS_PASSWORD` for authenticated servers |
+| `CAIRN_WORKER_ENROLLMENT_TOKEN` | — | one-time enrollment token from `POST /api/admin/worker-enrollments` |
+| `CAIRN_WORKER_NAME` | `strava-fetcher` | must equal the enrollment's `name` |
+| `CAIRN_WORKER_INSTANCE_ID` | the hostname | stable id when you run several instances |
+| `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` | — | set on exactly one instance |
+| `CAIRN_STRAVA_TOKEN_URL` | Strava's | override for testing against a mock |
+| `CAIRN_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |

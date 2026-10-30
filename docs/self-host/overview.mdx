@@ -13,8 +13,11 @@ Cairn is built to be self-hosted. A production deployment is:
   side of the NATS control plane.
 - **Postgres 17** with **TimescaleDB** (streams) and **PostGIS** (segments).
 - **NATS + JetStream** — the worker control plane and async job/result bus.
-- **An S3-compatible object store** (MinIO, Garage, AWS S3, …) for raw blobs
-  and photos. Optional — core runs without it, you just lose blob upload.
+- **An S3-compatible object store** (MinIO, Garage, AWS S3, …) for raw blobs,
+  photos and claim-checked worker results. Required: without it provider sync
+  dead-letters. `CAIRN_STORAGE_DRIVER=none` is the explicit opt-out for
+  API-only instances, see
+  [Choosing a store](/self-host/configuration#choosing-a-store).
 - **Provider workers** — one container per provider you use
   (`cairn-provider-strava`, `cairn-provider-garmin`), each a separate process.
 
@@ -47,6 +50,17 @@ The [Docker Compose](./docker.mdx) page has a configurator: pick the
 providers, object storage, reverse proxy and worker authentication you want
 and copy the resulting `docker-compose.yml` and `.env`. Pin the image tags to
 a release rather than `latest`, and upgrade core and the workers together.
+
+## Upgrading from 0.6.0
+
+- **Object storage is required.** Core now refuses to start when
+  `CAIRN_STORAGE_ACCESS_KEY_ID` / `CAIRN_STORAGE_SECRET_ACCESS_KEY` are unset,
+  instead of coming up without a blob store, a state in which every worker
+  result dead-lettered since 0.5.0. Deployments from the Compose configurator
+  or the Kubernetes bundle already set them. An instance that really has no
+  store sets `CAIRN_STORAGE_DRIVER=none`; the opt-out is logged at Error and
+  shown as Degraded in the health probe. See
+  [Storage](/self-host/configuration#storage-s3-compatible).
 
 ## Upgrading to 0.6.0
 

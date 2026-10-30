@@ -115,6 +115,8 @@ export function buildCompose(o) {
       '      CAIRN_STORAGE_SECRET_ACCESS_KEY: ${CAIRN_STORAGE_SECRET_ACCESS_KEY}',
     );
     push('      CAIRN_STORAGE_USE_PATH_STYLE: ${CAIRN_STORAGE_USE_PATH_STYLE}');
+  } else if (o.storage === 'none') {
+    push('      CAIRN_STORAGE_DRIVER: none');
   }
   if (o.email === 'smtp') {
     push('      CAIRN_EMAIL_ADAPTER: smtp');

@@ -129,18 +129,47 @@ provider. List the provider ids, then configure each one under its own prefix.
 | `CAIRN_NATS_AUTH_CALLOUT` | `false` | answer NATS auth-callout requests and admit enrolled workers, see [NATS auth-callout](/self-host/providers#nats-auth-callout) |
 | `CAIRN_NATS_WORKER_ACCOUNT` | — | the nats.conf account admitted workers join, the one core connects to (e.g. `CAIRN`); required when `CAIRN_NATS_AUTH_CALLOUT=true` |
 
-## Storage (S3-compatible, optional)
+## Storage (S3-compatible)
+
+Object storage is required for a working instance. Every event-carrying
+worker result is [claim-checked](/architecture/provider-contract#5-results--claim-check--must)
+through it, so without a store provider sync dead-letters after the retry
+budget, and raw uploads, photos and cached map snapshots are unavailable. Core
+refuses to start without credentials unless you opt out explicitly with
+`CAIRN_STORAGE_DRIVER=none`.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `CAIRN_STORAGE_ENDPOINT` | `http://minio:9000` | |
+| `CAIRN_STORAGE_DRIVER` | `s3` | `s3` needs the access key and secret below. `none` runs without object storage, for API-only or development instances: core logs the opt-out at Error on start and the health probe reports storage as Degraded, with the consequences in the detail |
+| `CAIRN_STORAGE_ENDPOINT` | `http://minio:9000` | the address core and the workers use; worker presigned URLs are signed for this host, so workers must reach it |
 | `CAIRN_STORAGE_REGION` | `us-east-1` | |
-| `CAIRN_STORAGE_BUCKET` | `cairn` | |
-| `CAIRN_STORAGE_ACCESS_KEY_ID` / `..._SECRET_ACCESS_KEY` | — | when both are empty, core runs without blob storage: no raw-file uploads, no photos, no cached map snapshots |
+| `CAIRN_STORAGE_BUCKET` | `cairn` | created on start when missing |
+| `CAIRN_STORAGE_ACCESS_KEY_ID` / `..._SECRET_ACCESS_KEY` | — | required with `CAIRN_STORAGE_DRIVER=s3` |
 | `CAIRN_STORAGE_USE_PATH_STYLE` | `true` | path-style addressing (MinIO, Garage); `false` for virtual-hosted buckets |
 | `CAIRN_STORAGE_PRESIGN_TTL` | `15m` | lifetime of the presigned upload and download URLs handed to clients and workers |
-| `CAIRN_STORAGE_PUBLIC_ENDPOINT` | — | object-store origin that browsers and native apps can reach, used only to presign the URLs handed to them; `CAIRN_STORAGE_ENDPOINT` stays the internal address core and the workers use. Unset, core serves photos, uploads and exports itself through signed `/content/{token}` URLs (HMAC claims, 15 minutes), which works on every deployment |
+| `CAIRN_STORAGE_PUBLIC_ENDPOINT` | — | object-store origin that browsers and native apps can reach, used only to presign the URLs handed to them; `CAIRN_STORAGE_ENDPOINT` stays the internal address core and the workers use. Unset, core serves photos, uploads and exports itself through signed `/content/{token}` URLs (HMAC claims, 15 minutes), which works on every deployment. Set, browser uploads PUT straight to the bucket, which needs a CORS rule allowing `PUT` from the web UI's origin; core does not create one |
 | `CAIRN_STORAGE_TRANSFER_EXPIRY_DAYS` | `1` | bucket lifecycle rule for claim-checked worker results under `transfer/`; core deletes them right after ingest, the rule only reaps orphans |
+
+### Choosing a store
+
+Any S3-compatible store works. Core uses object put, get, head, delete and
+list, presigned `GET` and `PUT` URLs, bucket creation and one lifecycle rule
+(`PutBucketLifecycleConfiguration`), so check that last one against a store
+you have not seen Cairn run on.
+
+- **MinIO** is what the Compose configurator and the Kubernetes bundle ship:
+  one container, one volume, path-style addressing. Core does not need the
+  management console, so the 2025 community builds without it are fine.
+- **Garage** is a lighter single-binary store that suits small instances and
+  low-power hardware. Path-style, same env as MinIO.
+- **A managed bucket** (AWS S3, Hetzner Object Storage, …) removes the extra
+  container and the backup job. Set `CAIRN_STORAGE_USE_PATH_STYLE=false` for
+  virtual-hosted buckets such as AWS, create the bucket yourself if the
+  credentials may not, and consider `CAIRN_STORAGE_PUBLIC_ENDPOINT` so photos
+  and uploads bypass core.
+
+In every case the workers must reach `CAIRN_STORAGE_ENDPOINT`; they PUT
+results and raw blobs there directly, core only mints the URLs.
 
 ## Maps
 

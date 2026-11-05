@@ -247,7 +247,7 @@ These limits are fixed in the server, not configurable:
 | File upload, `POST /api/activities/upload` | 64 MiB file, plus 1 MiB multipart framing | `400` |
 | Attachment, `POST /api/activities/{id}/attachments` | 32 MiB file, plus 1 MiB framing and caption | `400` |
 | JSON request bodies of the REST API and MCP requests | 1 MiB | `400` |
-| Provider webhook deliveries, `POST /webhooks/{provider}` | 1 MiB | `413` |
+| Provider webhook deliveries, `POST /webhooks/{worker_key}` | 1 MiB | `413` |
 
 A body over the limit is refused, not truncated.
 

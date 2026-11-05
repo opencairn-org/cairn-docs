@@ -64,6 +64,11 @@ of an admin account; OAuth tokens are refused.
 - **Worker fleet**: live instances (`/api/admin/workers`), pools and their
   retirement (`/api/admin/worker-pools`), and enrollments, see
   [Providers](/self-host/providers#enrollment).
+- **Providers** (`/api/admin/providers`): what each worker package declared
+  about connecting its provider, bound to the package that declared it
+  first. `DELETE /api/admin/providers/{provider}` unbinds one so another
+  package can take it over; the live manifests are re-applied at once, so
+  stop or retire the old package's pools first.
 - **Webhook signing tokens** (`/api/admin/webhook-tokens`, bulk rotate):
   the per-account secrets provider webhooks are signed with.
 - **NATS account key**: bootstrap and rotate the auth-callout issuer key

@@ -184,6 +184,11 @@ Administrators see the fleet in the admin area and on `/api/admin/*`:
 - **Pools** (`GET /api/admin/worker-pools`): registered pools per provider,
   the package bound to each name, and **retire** for a pool that is gone for
   good (`POST /api/admin/worker-pools/{provider}/{name}/retire`).
+- **Providers** (`GET /api/admin/providers`): what each worker declared
+  about connecting its provider (`provider_meta`), bound to the package that
+  declared it first. **Unbind** (`DELETE /api/admin/providers/{provider}`)
+  lets another package take the provider over: core re-applies the live
+  manifests at once, so stop or retire the old package's pools first.
 - **Enrollments** (`GET /api/admin/worker-enrollments`): revoke and prolong,
   see [Enrollment](#enrollment).
 - **Health** (`GET /api/admin/health`) grades the fleet: live instances with

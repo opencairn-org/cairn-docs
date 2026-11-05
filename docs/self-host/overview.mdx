@@ -51,6 +51,30 @@ providers, object storage, reverse proxy and worker authentication you want
 and copy the resulting `docker-compose.yml` and `.env`. Pin the image tags to
 a release rather than `latest`, and upgrade core and the workers together.
 
+## Upgrading to 0.7.0
+
+Core 0.7 needs 0.7 workers (the usual major.minor rule), and this time the
+other way round too: 0.6 workers are refused the pre-0.5 job subjects they
+still subscribe to and cannot answer the OAuth code exchange.
+
+- **Provider knowledge moved to the workers.** Core no longer compiles in
+  Strava's or Garmin's OAuth endpoints, scopes or form labels; each worker
+  declares them in its manifest (`provider_meta`) and core stores them in
+  the new `providers` table (migration 00075, run automatically). The
+  migration seeds Strava and Garmin with the 0.6 values, so existing
+  connections keep working while you roll the workers.
+- **OAuth connects go through the pool.** Connecting a Strava account now
+  needs a live `strava` pool: it exchanges the authorization code. With no
+  pool online the Connections page reports `no_worker`.
+- **Webhook URLs are unchanged** but documented correctly now:
+  `/webhooks/<worker name>-<provider>`.
+- **Health metrics import on their own.** Accounts of a pool that declares
+  a metric type (Garmin) get an `import_metrics` job once a day alongside
+  reconcile; the manual button stays.
+- **Stricter worker isolation.** Core refuses token, credential and blob
+  requests that name an account or key of another provider; a worker that
+  kept to its own data notices nothing.
+
 ## Upgrading to 0.6.1
 
 - **Object storage is required.** Core now refuses to start when

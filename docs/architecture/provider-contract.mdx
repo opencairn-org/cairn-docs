@@ -45,6 +45,46 @@ subjects on the `CAIRN_RESULTS` interest stream — see
   [Versioning](#versioning)). Every published `JobResult` MUST carry
   `worker_name`, `worker_version` (the parser version `N.M`) and
   `worker_package`.
+- Worker request/reply subjects are provider-scoped on both sides (0.7):
+  core takes the provider from the subject a worker asked on and refuses
+  accounts and blob keys of other providers in the body.
+
+### Manifest and provider meta
+
+Write a JSON manifest to the `cairn_worker_manifests` KV bucket under the
+key `<worker_name>` at startup and again within its 15 min TTL:
+
+```json
+{"worker_name": "...", "version": "<parser N.M>", "provider": "...",
+ "package": "...", "updated_at": "<RFC3339>",
+ "provider_meta": {
+   "display_name": "Strava",
+   "activity_url_template": "https://www.strava.com/activities/{id}",
+   "setup_docs_url": "https://...",
+   "auth_method": "oauth2",
+   "oauth": {"authorize_url": "https://www.strava.com/oauth/authorize",
+             "scopes": ["read", "activity:read_all"], "scope_separator": ",",
+             "pkce": false, "authorize_params": {"approval_prompt": "force"}},
+   "config_fields": [
+     {"key": "client_id", "label": "Client ID", "help": "..."},
+     {"key": "client_secret", "label": "Client secret", "secret": true}]}}
+```
+
+`version`, `provider` and `package` drive update-available and the pool
+registry (§3). **`provider_meta` — MUST for a pool that links accounts** (0.7):
+core compiles no provider knowledge in; it stores the meta, bound to the
+first package that published it for the provider (a different package's meta
+is logged and ignored until an admin clears the row), and builds the
+connect form and the authorize URL from it. `auth_method` is `oauth2`
+(core runs the authorize round-trip, the pool exchanges the code — §9b) or
+`credentials` (the connection's `client_id`/`client_secret` slots hold a
+login, delivered by `cairn.creds.<provider>.get`). `config_fields` label the
+two slots; only `client_id` and `client_secret` exist. URLs must be https
+(http only on a loopback host). `oauth.pkce` makes core send an S256
+challenge and hand the verifier to the exchange; `authorize_params` are
+added to the authorize URL verbatim (`client_id`, `redirect_uri`,
+`response_type`, `scope`, `state` and the PKCE parameters are core's).
+Parser-only pools (file importers, re-parsers) omit `provider_meta`.
 
 ### Versioning
 
@@ -139,14 +179,10 @@ creation to these subjects:
 | `cairn.jobs.import_gear.<provider>.<worker_name>` | MUST if manifest declares `Gear` | the account's full gear list (0.4.0) |
 | `cairn.jobs.backfill.<provider>.<worker_name>` | MAY | legacy full-history walk |
 
-The 0.4 job subjects without `<worker_name>` stay subscribable so an
-upgraded worker drains jobs queued before the upgrade (reuse the old durable
-name; a work queue lets only one pool drain them). The permission template
-still grants them in 0.6.0; they go away in a later release, so do not rely
-on them for new jobs. Results and lookups are pool-scoped only.
-Workers publish their own `fetch_source` sub-jobs (reconcile, webhooks) to
-their own pool subject and their results to
-`cairn.results.<job>.<provider>.<worker_name>`.
+The pre-0.5 job subjects without `<worker_name>` are no longer granted
+(0.7). Results and lookups are pool-scoped only. Workers publish their own
+`fetch_source` sub-jobs (reconcile, webhooks) to their own pool subject and
+their results to `cairn.results.<job>.<provider>.<worker_name>`.
 
 :::warning[Why "every subject" is a MUST]
 `CAIRN_JOBS` is a work-queue stream — messages for a subject nobody consumes
@@ -196,6 +232,13 @@ included. Core publishes it on account connect, on the user's "Sync gear"
 and alongside every reconcile, only when a live worker for the provider
 declares `Gear` in its manifest.
 
+`import_metrics`: `{"job_id", "account_id", "user_id", "provider",
+"since_unix", "until_unix"}` — answer with METRIC events for the window.
+Core publishes it on the user's "Import health" and, from 0.7, once a day
+per account alongside reconcile (a day of overlap, 30 days on the first
+run), only when the account's pool declares a metric data type (`Steps`,
+`HRV`, `RestingHR`, `Sleep`, `Weight`, `WaterIntake`).
+
 `parse_blob`: as `fetch_source` plus
 `"blob": {"url": "<presigned GET>", "expires_at": "…", "fallback_handle": "<blob key>"}`
 and `"min_parser_version": "N.M"` (the source's current parser version; NAK
@@ -220,7 +263,12 @@ the import queue):
 1. Marshal the full `JobResult` (protojson).
 2. Request a presigned PUT via `cairn.blobs.presign_upload.<provider>` with
    `"kind": "result"`, `content_type`, `content_length` and the **hex**
-   `content_sha256` of the body.
+   `content_sha256` of the body. Core mints the key under the subject's
+   provider; a `user_id` in the request must hold an account of that
+   provider. The returned `blob_id` is the full key — hand it back verbatim
+   (`raw_blob_id`, attachments, `presign_download`, `payload_ref`): core
+   refuses keys outside `users/<user>/<provider>/…`, `shared/<provider>/…`
+   and (for results) `transfer/<provider>/…`.
 3. PUT the body to the returned URL, sending `required_headers` **verbatim**.
 4. Publish only the envelope: worker stamp + `new_watermark`/`more_available`
    + `payload_ref {blob_id, size_bytes, content_type, content_sha256}`, no
@@ -308,9 +356,12 @@ error or rate limit — the UI would show "0 importable activities".
 ## 9. Credentials & rate limits
 
 - Fetch credentials fresh per job over request/reply — OAuth providers:
-  `cairn.tokens.<provider>.get` (+ `.store`, `.needs_reauth`); custom-cred
-  providers: `cairn.creds.<provider>.get`. Never persist credentials in the
-  worker beyond in-memory caches.
+  `cairn.tokens.<provider>.get` (+ `.store`, `.needs_reauth`); credential
+  providers: `cairn.creds.<provider>.get`, which replies
+  `{"client_id", "client_secret"}` (the connection's slots; `email`/`password`
+  aliases until 0.8). The account named in the body must belong to the
+  subject's provider, or core answers `account_gone`. Never persist
+  credentials in the worker beyond in-memory caches.
 - Workers hold **zero** S3 credentials — all blob I/O goes through presigned
   URLs (§4/§5).
 - Rate-limited providers: reserve from the shared budget KV
@@ -332,8 +383,36 @@ Reply: `{"account_id": "…", "user_id": "…"}` or `{"error": "not_found" |
 "auto_import_suspended" | …}`. `subscription_id` is preferred when known. The
 same provider account may be connected once per pool; core returns the
 connection of the pool named in the subject (a connection without a pool
-matches any). The pre-0.5 `cairn.accounts.lookup_by_provider_ext` is no
-longer granted to workers.
+matches any). The pre-0.5 `cairn.accounts.lookup_by_provider_ext`
+responder is gone (0.7).
+
+Webhook deliveries reach core on `POST /webhooks/<worker_key>` (the pool's
+`<worker_name>-<provider>`); core forwards them to
+`cairn.webhooks.<worker_key>.event` and relays `GET` handshakes to
+`cairn.webhooks.<worker_key>.verify`.
+
+## 9b. OAuth code exchange — MUST for `auth_method: oauth2`
+
+Core runs the authorize round-trip from the manifest's `oauth` block and then
+asks the pool to exchange the code, on plain request/reply
+`cairn.oauth.<provider>.<worker_name>.exchange` (the template allows
+subscribing to it):
+
+Request:
+
+```json
+{"connection_id": "…", "client_id": "…", "client_secret": "…",
+ "code": "…", "redirect_uri": "https://<instance>/auth/oauth/<provider>/callback",
+ "code_verifier": "<PKCE, when declared>"}
+```
+
+Reply: `{"access_token", "refresh_token", "expires_at": "<RFC3339>",
+"scope", "token_type", "provider_account_id"}` or
+`{"error": "exchange_failed" | "bad_request" | "transient", "message": "…"}`.
+`provider_account_id` is the provider's stable id of the account (Strava's
+athlete id); core keys webhook lookups and the one-holder rule on it, so
+fetch it when the token response does not carry it. Core stores the reply
+as the account's token state; the worker keeps nothing. Answer within 20 s.
 
 ## 10. Conformance harness
 

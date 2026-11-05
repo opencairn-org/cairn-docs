@@ -14,10 +14,41 @@ Since 0.3.0 core and both workers are tagged together. The worker contract
 (`cairn.worker.v1`) changes only with a core minor; a worker needs the same
 `major.minor` as core before 1.0.
 
+## 0.7.0
+
+**2026-11-05** · **Components:** cairn-core v0.7.0 · cairn-provider-strava v0.7.0 ·
+cairn-provider-garmin v0.7.0 · [documentation](/)
+
+**Upgrade:** roll core and both workers together. Core 0.7 refuses 0.6
+workers, and 0.6 workers cannot serve core 0.7. Migration 00075 runs on
+start and seeds Strava and Garmin, so existing connections keep working
+while the workers restart; connecting a Strava account needs a live pool.
+See [Upgrading to 0.7.0](/self-host/overview#upgrading-to-070).
+
+- Provider knowledge lives in the workers: each manifest declares how its
+  provider is connected (`provider_meta`), core stores it and builds the
+  connect form and the authorize URL from it. A new provider needs no core
+  change.
+- The OAuth code exchange runs in the provider's pool; core handles the
+  authorize round-trip, with PKCE when the provider declares it.
+- Worker isolation: token, credential and blob requests are scoped to the
+  worker's provider, and blob keys must follow the documented layout.
+- Health metrics import once a day for pools that declare a metric type;
+  pools report what they read, on REST and Connect.
+- Administration: a Providers panel lists the declared providers and
+  unbinds one so another package can take it over.
+- Strava declares its provider meta and answers the code exchange; Garmin
+  publishes a manifest with provider meta and reads the generic credential
+  fields.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.7.0/CHANGELOG.md) ·
+[Strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.7.0/CHANGELOG.md) ·
+[Garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.7.0/CHANGELOG.md)
+
 ## 0.6.1
 
 **2026-10-30** · **Components:** cairn-core v0.6.1 · workers stay on 0.6.0 ·
-[documentation](/)
+[documentation](/0.6.1/)
 
 **Upgrade:** core now refuses to start without object storage credentials.
 Deployments from the Compose configurator or the Kubernetes bundle already

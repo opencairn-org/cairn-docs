@@ -153,7 +153,7 @@ function Steps({o}) {
   );
 }
 
-export default function ComposeConfigurator({defaultRelease = 'v0.6.1'}) {
+export default function ComposeConfigurator({defaultRelease = 'v0.7.0'}) {
   const version = useDocsVersion();
   const release =
     version.version === 'current' ? defaultRelease : `v${version.version}`;

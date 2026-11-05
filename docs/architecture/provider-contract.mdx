@@ -74,7 +74,8 @@ key `<worker_name>` at startup and again within its 15 min TTL:
 registry (§3). **`provider_meta` — MUST for a pool that links accounts** (0.7):
 core compiles no provider knowledge in; it stores the meta, bound to the
 first package that published it for the provider (a different package's meta
-is logged and ignored until an admin clears the row), and builds the
+is logged and ignored until an admin unbinds the provider,
+`DELETE /api/admin/providers/{provider}`), and builds the
 connect form and the authorize URL from it. `auth_method` is `oauth2`
 (core runs the authorize round-trip, the pool exchanges the code — §9b) or
 `credentials` (the connection's `client_id`/`client_secret` slots hold a

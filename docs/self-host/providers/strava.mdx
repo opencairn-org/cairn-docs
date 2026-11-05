@@ -51,7 +51,9 @@ so instances can be added and replaced freely.
 Strava can push new and changed activities instead of waiting for the next
 poll. Set `CAIRN_STRAVA_WEBHOOK_VERIFY_TOKEN` on **exactly one** worker
 instance: that instance owns the webhook subscription. Strava delivers to
-`https://<your instance>/webhooks/strava`, so the instance must be reachable
+`https://<your instance>/webhooks/<worker name>-strava` (the pool's worker
+key, `strava-fetcher-strava` by default; the Connections page shows it), so
+the instance must be reachable
 from the internet; core forwards the event to the pool over NATS. To scale
 Strava, run the pull workers without the token and one webhook-owner
 replica beside them.

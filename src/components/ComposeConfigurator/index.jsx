@@ -155,7 +155,6 @@ function Steps({o}) {
 
 // Image tags of a docs version whose worker releases differ from core's (core-only patches).
 const RELEASE_TAGS = {
-  '0.7.1': {core: 'v0.7.1', strava: 'v0.7.0', garmin: 'v0.7.0'},
   '0.6.1': {core: 'v0.6.1', strava: 'v0.6.0', garmin: 'v0.6.0'},
 };
 

@@ -16,11 +16,21 @@ Since 0.3.0 core and both workers are tagged together. The worker contract
 
 ## 0.7.1
 
-**2026-11-06** · **Components:** cairn-core v0.7.1 · workers stay on 0.7.0 ·
-[documentation](/)
+**2026-11-06** · **Components:** cairn-core v0.7.1 · cairn-provider-strava v0.7.1 ·
+cairn-provider-garmin v0.7.1 · cairn-provider-sdk-go v0.7.1 ·
+cairn-provider-sdk-python v0.7.1 · [documentation](/)
 
-**Upgrade:** replace the core image; no migration, no worker upgrade. See
+**Upgrade:** replace the core image; no migration. The 0.7.1 workers are
+optional, 0.7.0 workers keep working. See
 [Upgrading to 0.7.1](/self-host/overview#upgrading-to-071).
+
+- The provider SDKs are published:
+  [cairn-provider-sdk-go](https://github.com/opencairn-org/cairn-provider-sdk-go)
+  and [cairn-provider-sdk-python](https://github.com/opencairn-org/cairn-provider-sdk-python)
+  implement the worker contract, ship the proto stubs and carry a test kit.
+  Their major.minor follows core's. The Strava and Garmin workers 0.7.1 are
+  built on them, with the same behaviour on the wire. See
+  [Write your own provider](/architecture/workers#write-your-own-provider).
 
 - Worker metrics are no longer dropped. The six daily health types still
   feed the health series; every other key (reserved keys such as
@@ -35,7 +45,11 @@ Since 0.3.0 core and both workers are tagged together. The worker contract
 - `worker-conformance --active` waits for the reconcile result on the pool's
   subject.
 
-Changelog: [core](https://github.com/opencairn-org/cairn-core/blob/v0.7.1/CHANGELOG.md)
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.7.1/CHANGELOG.md) ·
+[strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.7.1/CHANGELOG.md) ·
+[garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.7.1/CHANGELOG.md) ·
+[sdk-go](https://github.com/opencairn-org/cairn-provider-sdk-go/blob/v0.7.1/CHANGELOG.md) ·
+[sdk-python](https://github.com/opencairn-org/cairn-provider-sdk-python/blob/v0.7.1/CHANGELOG.md)
 
 ## 0.7.0
 

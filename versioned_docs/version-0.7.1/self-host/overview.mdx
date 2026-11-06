@@ -53,8 +53,9 @@ a release rather than `latest`, and upgrade core and the workers together.
 
 ## Upgrading to 0.7.1
 
-A core-only patch: replace the core image. No migration runs, and the 0.7.0
-workers keep working.
+Replace the core image; no migration runs. The Strava and Garmin workers
+0.7.1 are built on the new provider SDKs and behave as 0.7.0 does: upgrade
+them when convenient, the 0.7.0 workers keep working against core 0.7.1.
 
 - **Worker metrics are kept.** Core 0.7.0 stored only the six daily health
   types (`Steps`, `HRV`, `RestingHR`, `Sleep`, `Weight`, `WaterIntake`) and

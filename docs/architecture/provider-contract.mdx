@@ -349,9 +349,13 @@ namespace its own as `<provider>.<name>`.
   no rows. A metrics-store event without one is keyed `derived:<key>@<ts>`.
 - Metrics-store rows record the result's `worker_name` and `worker_version`
   as their source.
+- `ref` MUST carry the job's `user_id`, `provider` and `external_account_id`:
+  core stores a metric only for an account of that user and provider that
+  the result's pool serves, like activities and gear.
 - Core refuses a metric with an invalid key, the wrong shape for a reserved
   key (`value_json` for a numeric key, `value_numeric` for `sleep_stages`),
-  no or both values, invalid JSON or a malformed `user_id`. A refusal is
+  no or both values, invalid JSON, a malformed `user_id`, or a missing or
+  foreign `external_account_id`. A refusal is
   logged and counted (`cairn_worker_metrics_refused_total`) and does not
   fail the result's other events.
 

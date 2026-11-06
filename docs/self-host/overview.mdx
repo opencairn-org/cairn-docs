@@ -51,6 +51,20 @@ providers, object storage, reverse proxy and worker authentication you want
 and copy the resulting `docker-compose.yml` and `.env`. Pin the image tags to
 a release rather than `latest`, and upgrade core and the workers together.
 
+## Upgrading to 0.7.1
+
+A core-only patch: replace the core image. No migration runs, and the 0.7.0
+workers keep working.
+
+- **Worker metrics are kept.** Core 0.7.0 stored only the six daily health
+  types (`Steps`, `HRV`, `RestingHR`, `Sleep`, `Weight`, `WaterIntake`) and
+  dropped every other metric key a worker sent. 0.7.1 stores the others in
+  the metrics store (`GET /api/metrics`) with the worker as their source. A
+  metric core still refuses is logged at Warn as `worker metric refused` and
+  counted in `cairn_worker_metrics_refused_total`.
+- **Health samples carry the worker's id.** The first re-import replaces the
+  rows stored before, so the health series gains no duplicates.
+
 ## Upgrading to 0.7.0
 
 Core 0.7 needs 0.7 workers (the usual major.minor rule), and this time the

@@ -153,16 +153,25 @@ function Steps({o}) {
   );
 }
 
-export default function ComposeConfigurator({defaultRelease = 'v0.7.0'}) {
+// Image tags of a docs version whose worker releases differ from core's (core-only patches).
+const RELEASE_TAGS = {
+  '0.7.1': {core: 'v0.7.1', strava: 'v0.7.0', garmin: 'v0.7.0'},
+  '0.6.1': {core: 'v0.6.1', strava: 'v0.6.0', garmin: 'v0.6.0'},
+};
+
+function releaseTags(version) {
+  const tag = `v${version}`;
+  return RELEASE_TAGS[version] ?? {core: tag, strava: tag, garmin: tag};
+}
+
+export default function ComposeConfigurator({defaultRelease = 'v0.7.1'}) {
   const version = useDocsVersion();
   const release =
-    version.version === 'current' ? defaultRelease : `v${version.version}`;
+    version.version === 'current'
+      ? defaultRelease.replace(/^v/, '')
+      : version.version;
 
-  const [tags, setTags] = useState({
-    core: release,
-    strava: release,
-    garmin: release,
-  });
+  const [tags, setTags] = useState(() => releaseTags(release));
   const [o, setO] = useState({
     strava: true,
     garmin: true,

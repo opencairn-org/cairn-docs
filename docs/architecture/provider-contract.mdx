@@ -10,8 +10,8 @@ Every provider worker (strava, garmin, yours) is a standalone process in its
 own repo — see [Provider workers](/architecture/workers). The **only**
 contract with cairn-core is:
 
-1. the protobuf messages in `cairn.worker.v1` (committed stubs in each worker
-   repo), and
+1. the protobuf messages in `cairn.worker.v1` (the provider SDKs ship the
+   stubs; a worker without an SDK generates its own), and
 2. the NATS subjects + behaviors specified here.
 
 This page is normative: **MUST** items are required for a worker to be

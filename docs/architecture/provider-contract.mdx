@@ -234,7 +234,8 @@ and alongside every reconcile, only when a live worker for the provider
 declares `Gear` in its manifest.
 
 `import_metrics`: `{"job_id", "account_id", "user_id", "provider",
-"since_unix", "until_unix"}` — answer with METRIC events for the window.
+"since_unix", "until_unix"}` — answer with METRIC events for the window
+([metric events](#metric-events)).
 Core publishes it on the user's "Import health" and, from 0.7, once a day
 per account alongside reconcile (a day of overlap, 30 days on the first
 run), only when the account's pool declares a metric data type (`Steps`,
@@ -312,6 +313,47 @@ and `import_gear` results `result:<job_id>`, fetch_source sub-jobs enqueued by r
 **Stream hygiene — SHOULD:** emit strictly unique, ordered sample
 timestamps. Core dedupes defensively (last sample wins), but providers do
 ship duplicate samples around pauses — clean them at the source.
+
+### Metric events
+
+An `import_metrics` result carries `WORKER_EVENT_TYPE_METRIC` events
+(`ImportedMetric{ref, key, ts, value_numeric | value_json}`). Set exactly one
+value: `value_numeric` for a scalar, `value_json` (a JSON document) for a
+structured value such as `sleep_stages`. Core stores the metric by its `key`:
+
+| `key` | Stored in | Served by |
+|---|---|---|
+| a time-series data type: `Steps`, `HRV`, `RestingHR`, `Sleep`, `Weight`, `WaterIntake` | health series, merged per day across providers | web `/health`, `GET /api/health?type=`, `ListHealthSeries` |
+| a reserved key (below, from `metrics.proto`) | metrics store | `GET /api/metrics`, `MetricsService` |
+| a provider-namespaced key `<provider>.<name>`, e.g. `whoop.recovery_score` | metrics store | `GET /api/metrics`, `MetricsService` |
+
+Reserved keys; all numeric except `sleep_stages`, which takes `value_json`
+(`{"stages": [{"start", "end", "stage"}]}`):
+
+| Group | Keys |
+|---|---|
+| Body composition | `weight_kg`, `body_fat_pct`, `lean_mass_kg`, `bone_mass_kg`, `hydration_pct`, `muscle_mass_kg` |
+| Cardiovascular | `resting_hr_bpm`, `max_hr_bpm`, `hrv_rmssd_ms`, `hrv_sdnn_ms`, `blood_pressure_systolic_mmhg`, `blood_pressure_diastolic_mmhg`, `spo2_pct` |
+| Activity rollups | `steps`, `floors_climbed`, `active_minutes`, `calories_burned_kcal` |
+| Sleep | `sleep_total_min`, `sleep_deep_min`, `sleep_rem_min`, `sleep_light_min`, `sleep_awake_min`, `sleep_score`, `sleep_stages` |
+| Performance | `vo2max_ml_kg_min`, `ftp_cycling_w`, `lthr_running_bpm`, `lthr_cycling_bpm`, `threshold_pace_running_s_per_km`, `css_swimming_s_per_100m`, `critical_power_w`, `w_prime_kj` |
+| Training load (core computes these) | `tss`, `ctl`, `atl`, `tsb` |
+| Wellness | `mood`, `energy`, `soreness`, `stress`, `motivation` |
+
+A metrics-store key matches `^[a-z0-9][a-z0-9_.]*$` (at most 64 characters).
+Core stores any such key, but a worker SHOULD send a reserved key or
+namespace its own as `<provider>.<name>`.
+
+- `ref.external_id` SHOULD be a stable per-sample id: re-imports upsert on
+  (user, key, `ts`, provider, `external_id`), so a re-run of the window adds
+  no rows. A metrics-store event without one is keyed `derived:<key>@<ts>`.
+- Metrics-store rows record the result's `worker_name` and `worker_version`
+  as their source.
+- Core refuses a metric with an invalid key, the wrong shape for a reserved
+  key (`value_json` for a numeric key, `value_numeric` for `sleep_stages`),
+  no or both values, invalid JSON or a malformed `user_id`. A refusal is
+  logged and counted (`cairn_worker_metrics_refused_total`) and does not
+  fail the result's other events.
 
 ## 6. Failure envelope — MUST
 

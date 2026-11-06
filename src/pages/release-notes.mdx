@@ -37,6 +37,11 @@ optional, 0.7.0 workers keep working. See
   `spo2_pct` or `sleep_stages`, provider keys such as `whoop.recovery_score`)
   lands in the metrics store with provider, account and worker as its
   source. Refused metrics are logged and counted.
+- The Health page shows them: **All metrics** lists the newest value of
+  every key in the metrics store, grouped by provider, with units, a
+  sparkline or the fields of a structured value, and each metric's recent
+  entries with their source. See
+  [Health & athlete metrics](/using-cairn/metrics#daily-health).
 - A metric is stored only for an account of its user and provider that the
   sending pool serves.
 - The webhook verify handshake no longer lands in the `CAIRN_WEBHOOKS`

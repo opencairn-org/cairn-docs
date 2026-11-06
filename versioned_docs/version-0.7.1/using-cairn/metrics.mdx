@@ -1,0 +1,66 @@
+---
+id: metrics
+title: Health & athlete metrics
+sidebar_position: 7
+---
+
+# Health & athlete metrics
+
+Besides activities, Cairn stores three kinds of measurements about you.
+
+## Athlete profile
+
+The **Athlete** page holds the physiology that feeds the training-load
+estimate: FTP, threshold heart rate, max and resting heart rate, weight,
+height and run threshold pace. Every value is dated, so an activity's TSS is
+computed with the values that were valid on its day. Changing a value and
+pressing **Recalculate** re-derives TSS and the
+[training load](/using-cairn/training-load) curves.
+
+API: `GET /api/athlete/metrics` (the specs and your entries),
+`PUT /api/athlete/metrics` with `key`, `effective_date` and `value`,
+`DELETE /api/athlete/metrics/{id}` and `POST /api/athlete/recalculate`.
+
+## Daily health
+
+The **Health** page charts the daily health series a provider worker
+imports: HRV, sleep, weight, steps, resting heart rate. Several providers
+reporting the same day are merged per type by the provider cascade, like
+activity sources. It stays empty until a worker that imports health (the
+Garmin worker) is connected. API: `GET /api/health?type=HRV&days=90`.
+
+## The metric store
+
+Since 0.6.0 every measurement, imported or entered by hand, lives in one
+time-series store you can query and write to. A metric is a `key`, a
+timestamp, an optional `period_seconds` (a daily value covers 86400 s), a
+numeric value or a structured one (`sleep_stages`), the provider it came
+from, tags and notes.
+
+Keys are lower-case words joined with `_` or `.`. A set of documented keys
+is reserved for well-known measurements so that clients agree on names:
+body (`weight_kg`, `body_fat_pct`, `lean_mass_kg`, `hydration_pct`, …),
+heart (`resting_hr_bpm`, `max_hr_bpm`, `hrv_rmssd_ms`, `hrv_sdnn_ms`,
+`blood_pressure_*_mmhg`, `spo2_pct`), activity (`steps`, `floors_climbed`,
+`active_minutes`, `calories_burned_kcal`), sleep (`sleep_total_min`,
+`sleep_deep_min`, `sleep_rem_min`, `sleep_light_min`, `sleep_awake_min`,
+`sleep_score`), performance (`vo2max_ml_kg_min`, `ftp_cycling_w`,
+`lthr_running_bpm`, `lthr_cycling_bpm`, `threshold_pace_running_s_per_km`,
+`css_swimming_s_per_100m`, `critical_power_w`, `w_prime_kj`), load (`tss`,
+`ctl`, `atl`, `tsb`) and wellness (`mood`, `energy`, `soreness`, `stress`,
+`motivation`). Any other well-formed key is accepted as a custom metric.
+
+| Call | What |
+| --- | --- |
+| `GET /api/metrics?keys=a,b&from=&to=&providers=&sort=&limit=&offset=` | raw samples, filtered and paged in SQL |
+| `GET /api/metrics/latest?keys=a,b&as_of=` | the newest value per key, optionally as of a date |
+| `GET /api/metrics/series?key=&from=&to=&bucket=hour\|day\|week\|month&aggregation=avg\|min\|max\|sum\|last\|first\|count&max_points=` | a bucketed TimescaleDB series, capped by `max_points` |
+| `GET /api/metrics/context?as_of=` | your stored measurements, the athlete profile filling the gaps, and the merge policies: everything a client needs to interpret an activity |
+| `PUT /api/metrics` | upsert one sample; `dedup_by_natural_key: true` replaces a sample with the same key, time and provider instead of adding one |
+| `POST /api/metrics/bulk` | up to 1000 samples, `continue_on_error` to keep going past a bad row |
+| `DELETE /api/metrics/{id}` | remove one sample |
+
+The Connect counterparts are on `MetricsService` (`ListMetrics`,
+`GetLatestMetrics`, `QueryMetricSeries`, `GetUserContext`, `UpsertMetric`,
+`BulkUpsertMetrics`, `DeleteMetric`). Reading needs the `training:read`
+scope, writing `training:write`, see [OAuth](/integrations/oauth#scopes).

@@ -14,10 +14,52 @@ Since 0.3.0 core and both workers are tagged together. The worker contract
 (`cairn.worker.v1`) changes only with a core minor; a worker needs the same
 `major.minor` as core before 1.0.
 
+## 0.7.1
+
+**2026-11-06** · **Components:** cairn-core v0.7.1 · cairn-provider-strava v0.7.1 ·
+cairn-provider-garmin v0.7.1 · cairn-provider-sdk-go v0.7.1 ·
+cairn-provider-sdk-python v0.7.1 · [documentation](/)
+
+**Upgrade:** replace the core image; no migration. The 0.7.1 workers are
+optional, 0.7.0 workers keep working. See
+[Upgrading to 0.7.1](/self-host/overview#upgrading-to-071).
+
+- The provider SDKs are published:
+  [cairn-provider-sdk-go](https://github.com/opencairn-org/cairn-provider-sdk-go)
+  and [cairn-provider-sdk-python](https://github.com/opencairn-org/cairn-provider-sdk-python)
+  implement the worker contract, ship the proto stubs and carry a test kit.
+  Their major.minor follows core's. The Strava and Garmin workers 0.7.1 are
+  built on them, with the same behaviour on the wire. See
+  [Write your own provider](/architecture/workers#write-your-own-provider).
+
+- Worker metrics are no longer dropped. The six daily health types still
+  feed the health series; every other key (reserved keys such as
+  `spo2_pct` or `sleep_stages`, provider keys such as `whoop.recovery_score`)
+  lands in the metrics store with provider, account and worker as its
+  source. Refused metrics are logged and counted.
+- The Health page shows them: **All metrics** lists the newest value of
+  every key in the metrics store, grouped by provider, with units, a
+  sparkline or the fields of a structured value, and each metric's recent
+  entries with their source. See
+  [Health & athlete metrics](/using-cairn/metrics#daily-health).
+- A metric is stored only for an account of its user and provider that the
+  sending pool serves.
+- The webhook verify handshake no longer lands in the `CAIRN_WEBHOOKS`
+  stream, which answered before the worker could (Strava's `hub.challenge`
+  never echoed back).
+- `worker-conformance --active` waits for the reconcile result on the pool's
+  subject.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.7.1/CHANGELOG.md) ·
+[strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.7.1/CHANGELOG.md) ·
+[garmin](https://github.com/opencairn-org/cairn-provider-garmin/blob/v0.7.1/CHANGELOG.md) ·
+[sdk-go](https://github.com/opencairn-org/cairn-provider-sdk-go/blob/v0.7.1/CHANGELOG.md) ·
+[sdk-python](https://github.com/opencairn-org/cairn-provider-sdk-python/blob/v0.7.1/CHANGELOG.md)
+
 ## 0.7.0
 
 **2026-11-05** · **Components:** cairn-core v0.7.0 · cairn-provider-strava v0.7.0 ·
-cairn-provider-garmin v0.7.0 · [documentation](/)
+cairn-provider-garmin v0.7.0 · [documentation](/0.7.0/)
 
 **Upgrade:** roll core and both workers together. Core 0.7 refuses 0.6
 workers, and 0.6 workers cannot serve core 0.7. Migration 00075 runs on

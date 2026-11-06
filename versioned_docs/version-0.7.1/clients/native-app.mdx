@@ -1,0 +1,128 @@
+---
+id: native-app
+title: Native app (experimental)
+sidebar_label: Native app (experimental)
+sidebar_position: 1
+---
+
+# Native app (experimental)
+
+:::warning[Experimental]
+The native app is **pre-1.0 and view-only**. It is under active development,
+a minor release may break things, and it is not in any app store. Nothing in
+your instance depends on it: it is one more OAuth client of the server, and
+the web UI stays the complete interface. Use it if you like living on the
+edge and report what breaks.
+:::
+
+**cairn-kmp** is Cairn's client for **Android, iOS, Linux, Windows and
+macOS**, written once in Kotlin Multiplatform with a Compose UI. It shows
+your activities from a cairn-core instance; imports, uploads and edits stay
+in the web UI until after 1.0. Like core it is AGPL-3.0 and lives at
+[github.com/opencairn-org/cairn-kmp](https://github.com/opencairn-org/cairn-kmp).
+
+## What it does today
+
+The first release, 0.1.0, covers the core viewing experience:
+
+- **Overview**: lifetime totals, this and last week, the home feed with
+  Mine, Friends and Federated filters (Federated only when the instance has
+  federation on).
+- **Activities**: the list with type and discipline facets, date presets,
+  flags, sort and paging; the detail page with header, badges, gear, stats,
+  photos, best efforts, description and sources.
+- **Map and streams**: an interactive route map with start, finish and
+  cursor markers, a full-screen map, and stream charts per channel whose
+  cursor moves the map marker. A legend hides and shows channels.
+- **Offline first**: everything renders from a local cache and refreshes
+  from the server, so the app opens and shows your data without a
+  connection.
+- **Sign-in**: OAuth 2.1 in the system browser, a personal access token as
+  fallback, and signing in another device by code.
+
+Not there yet: heatmap, training load, stats and records, segments, health
+and athlete metrics, gear management, connections and sync status, social
+views and notifications. They follow in the next releases, in that order,
+all read-only. Writes of any kind, admin pages and a web target are out of
+scope before 1.0.
+
+## Compatibility
+
+| cairn-kmp | cairn-core |
+| --- | --- |
+| 0.1.x | 0.6.0 or later |
+
+The app uses only the Connect-RPC API, which core completed in 0.6.0, and
+pins the proto contract to a core release tag. Against an older core most
+screens fail with "not available".
+
+## Install
+
+Releases are published on the
+[GitHub releases page](https://github.com/opencairn-org/cairn-kmp/releases),
+not in app stores:
+
+- **Android** (8.0 or later): a signed APK. The app checks that page for
+  updates. A Play Store listing follows after 1.0.
+- **Desktop**: Linux (`.deb` and tarball), Windows (`.msix` and zip) and
+  macOS (`.zip`, Apple Silicon, macOS 14.3 or later) packages with automatic
+  updates. They join the releases once the packaging pipeline is switched
+  on; until then build from source with `make desktop`.
+- **iOS**: TestFlight, once Apple signing is set up.
+
+Every artifact is signed keyless with cosign and carries a provenance
+attestation; each release's notes list the verify commands. Building from
+source needs JDK 25 and the Android SDK; `make build` produces a debug APK
+and the desktop jar.
+
+## Connecting to your instance
+
+1. Enter the instance URL on first start. The app reads the public instance
+   info (release, features, supported scopes) and the OAuth server metadata
+   at `/.well-known/oauth-authorization-server`.
+2. It registers itself as an OAuth client (dynamic client registration) and
+   opens your browser for an Authorization Code + PKCE sign-in; you approve
+   the read scopes plus `devices:read` and `devices:write` on the consent
+   screen. Tokens are stored in the platform keystore (Keychain, Android
+   Keystore, a `0600` file on desktop) and refreshed in the background.
+3. On a device without a convenient browser, pick **Sign in from another
+   device**: the app shows an eight-digit code and a QR code, and you
+   approve it from the web UI's **Sign in a device** page or from the app on
+   a phone that is already signed in.
+4. **Advanced** accepts a personal access token instead of OAuth.
+
+Signing out revokes the tokens. You can also cut an installation off from
+the web UI under **Settings → Authorized apps**, see
+[Authorized apps](/integrations/oauth#authorized-apps).
+
+## What your instance needs
+
+Nothing beyond the defaults, as long as:
+
+- `CAIRN_AUTH_OAUTH_ENABLED` and `CAIRN_AUTH_OAUTH_ALLOW_DYNAMIC_REGISTRATION`
+  stay `true` (their defaults). With registration off, the app cannot
+  register itself.
+- `CAIRN_HTTP_PUBLIC_BASE_URL` is the URL users type into the app; the
+  browser is redirected back to the app's loopback port after sign-in,
+  which core allows for registered loopback redirect URIs.
+- The instance is reachable over HTTPS. Release builds refuse cleartext
+  HTTP; only debug builds allow it for `localhost`.
+
+Photos, map snapshots and exports arrive as signed URLs; with
+`CAIRN_STORAGE_PUBLIC_ENDPOINT` set they come straight from your object
+store, otherwise core serves them. See
+[Configuration](/self-host/configuration#storage-s3-compatible).
+
+## Data on the device
+
+The app keeps one SQLite database per server and account with the cached
+activities, streams (with a size budget and eviction) and page cursors, plus
+the tokens in the keystore. Deleting the app removes all of it; signing out
+revokes the tokens and keeps the cache for the next sign-in.
+
+## Where it is going
+
+The repository's `docs/ARCHITECTURE.md` and `docs/plan.md` describe the
+design and the phases, and `docs/handover.md` records what core implemented
+for this client in 0.6.0. Releases and their notes are on GitHub; the
+[release notes](/release-notes) on this site cover core and the workers.

@@ -29,6 +29,14 @@ reporting the same day are merged per type by the provider cascade, like
 activity sources. It stays empty until a worker that imports health (the
 Garmin worker) is connected. API: `GET /api/health?type=HRV&days=90`.
 
+Below the daily cards, **All metrics** (since 0.7.1) lists everything else in
+the [metric store](#the-metric-store): the newest value of every key, grouped
+into the reserved keys and one group per provider (`oura.*`, `whoop.*`, …).
+Numbers carry the unit their key names (`_pct`, `_bpm`, `_min`, `_s_per_km`,
+…) and a sparkline over the selected period; structured values list their
+fields, sleep stages as minutes per stage. Select a metric for its last 30
+entries with the provider, worker and version that wrote them.
+
 ## The metric store
 
 Since 0.6.0 every measurement, imported or entered by hand, lives in one

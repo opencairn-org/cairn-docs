@@ -1,0 +1,91 @@
+---
+id: activities-and-heatmap
+title: Activities, filters & heatmap
+sidebar_position: 2
+---
+
+# Activities, filters & heatmap
+
+Every imported workout ends up on the **Activities** page, and every GPS track
+on the **Heatmap**. Both views share the same filter bar, so a filter you build
+on one applies unchanged to the other.
+
+## The filter bar
+
+The bar narrows the list by:
+
+- **Type and discipline** — facets with counts, computed from your data.
+- **Year** — a facet listing every year with data; picking one is shorthand for
+  a date range covering that year.
+- **Date range** — explicit `from` / `to` dates, or the presets `7d`, `30d`,
+  `90d` and `1y`.
+- **Ranges** — distance, duration, elevation gain, average speed, heart rate
+  and power, each as a min/max pair in your preferred units.
+- **Flags** — virtual, e-bike, commute and race, each tri-state: any, only, or
+  none.
+- **Sort** — newest, oldest, longest distance, longest duration, most climbing,
+  fastest average.
+
+The list is paged; the filter and page live in the URL, so a filtered view can
+be bookmarked or shared with another user of the instance.
+
+## Heatmap
+
+The heatmap (`/heatmap`) draws every GPS track the current filter matches as a
+translucent line on one map. Routes you ride or run often accumulate and burn
+brightest; a one-off detour stays faint. Click a track to open its activity.
+
+The tracks come from the server's 30-second aggregates through a single request
+to `GET /api/activities/heatmap`, which accepts the same filter parameters as
+the activities feed. The response covers the newest 5000 matching activities
+and flags when it had to truncate; narrow the filter if you hit that ceiling.
+
+## The activity page and its map
+
+Each activity has an interactive map and a static **map snapshot** that Cairn
+renders server-side for feeds, notifications and share links. The interactive
+map uses a key-less vector style by default; self-hosters can point the web UI
+at their own style and the snapshot renderer at their own tiles, see
+[Maps in Configuration](/self-host/configuration#maps).
+
+## Managing an activity
+
+The **Manage** page of an activity (owner only) collects the maintenance
+actions:
+
+- **Export** the activity as GPX, TCX or FIT. The export options let you strip
+  data before download: GPS, altitude, distance, speed, heart rate, power,
+  cadence, temperature and the title can each be excluded. The same choices are
+  available on the API as
+  `GET /api/activities/{id}/export.gpx?exclude=gps,heart_rate,...` (likewise
+  `export.tcx` and `export.fit`). Valid keys: `gps`, `altitude`, `distance`,
+  `speed`, `heart_rate`, `power`, `cadence`, `temperature`, `title`; an unknown
+  key is a `400`. `GET /api/activities/{id}/export/options` returns which of
+  them the activity has (`available`).
+- **Regenerate map snapshot** re-renders the static `map.png`, for when the
+  track changed after the snapshot was cached or a render failed
+  (`POST /api/activities/{id}/map/regenerate`).
+- Merge policy and source handling, see [Merging sources](/using-cairn/merge).
+- **Delete** soft-deletes the activity and denylists its sources, see
+  [Removing things](/using-cairn/import#removing-things).
+
+## Photos
+
+Activities carry photos: your uploads and the photos a provider mirrors.
+Since 0.6.0 every photo has three variants, the original, a 1280 px medium
+JPEG and a 320 px thumbnail, plus a **blurhash** placeholder the web UI shows
+while the image loads. `GET /api/activities/{id}/attachments` lists them with
+a URL per variant.
+
+Photos, map snapshots and exports are handed out as short-lived **signed
+URLs** a client fetches with a plain GET: either a presigned object-store URL
+when the instance sets `CAIRN_STORAGE_PUBLIC_ENDPOINT`, or core's own
+`GET /content/{token}` route (15 minutes) otherwise. Photos stored before
+0.6.0 get their variants from the operator's one-off
+`cairn attachments backfill-variants`.
+
+## Related
+
+- [Importing activities](/using-cairn/import) — where activities come from.
+- [Segments & best-efforts](/using-cairn/segments-and-efforts) — what is
+  computed on every import.

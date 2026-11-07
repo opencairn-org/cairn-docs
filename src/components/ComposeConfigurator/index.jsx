@@ -156,6 +156,7 @@ function Steps({o}) {
 // Image tags of a docs version whose worker releases differ from core's (core-only patches).
 const RELEASE_TAGS = {
   '0.6.1': {core: 'v0.6.1', strava: 'v0.6.0', garmin: 'v0.6.0'},
+  '0.7.2': {core: 'v0.7.2', strava: 'v0.7.1', garmin: 'v0.7.1'},
 };
 
 function releaseTags(version) {
@@ -163,7 +164,7 @@ function releaseTags(version) {
   return RELEASE_TAGS[version] ?? {core: tag, strava: tag, garmin: tag};
 }
 
-export default function ComposeConfigurator({defaultRelease = 'v0.7.1'}) {
+export default function ComposeConfigurator({defaultRelease = 'v0.7.2'}) {
   const version = useDocsVersion();
   const release =
     version.version === 'current'

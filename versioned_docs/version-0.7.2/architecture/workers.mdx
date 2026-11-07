@@ -1,0 +1,75 @@
+---
+id: workers
+title: Provider workers
+sidebar_position: 3
+---
+
+# Provider workers
+
+A provider worker is a **standalone process in its own repository**. Core does
+not depend on any worker's code, and a worker does not depend on core's code.
+The entire contract between them is:
+
+1. **The proto messages** — `cairn.v1` (activities, segments, metrics…) and
+   `cairn.worker.v1` (`Job`, `JobResult`, `WorkerEvent`, `WorkerManifest`).
+2. **The NATS subjects** — see [the pipeline](/architecture/pipeline).
+
+This is why the workers can be in different languages: **cairn-provider-strava**
+is Go, **cairn-provider-garmin** is Python. Each builds on the provider SDK for
+its language, which ships the generated proto stubs (Go `.pb.go` / Python
+`_pb2.py`), so a worker builds with no buf/toolchain dependency.
+
+## What a worker does
+
+- **Registers** via the enrollment-token flow (NATS auth-callout admits the
+  token and issues a user JWT scoped to the worker's provider).
+- **Consumes** its pool's jobs through durable pull consumers on the exact
+  `cairn.jobs.<job_type>.<provider>.<worker_name>` subjects (`fetch_source`,
+  `reconcile`, `parse_blob`, `import_metrics`, `import_gear`, `backfill`) and
+  serves `cairn.discover.<provider>.<worker_name>`. Instances sharing a
+  `worker_name` share the work; each connected account is assigned to one
+  pool.
+- **Fetches** from the provider's API (using per-user tokens or credentials
+  delivered over NATS: `cairn.tokens.<provider>.*`,
+  `cairn.creds.<provider>.get`).
+- **Publishes** `cairn.worker.v1.JobResult` with `WorkerEvent`s (imported
+  activities, laps, segment efforts, records, metrics).
+- **Heartbeats** its capability manifest (which data types it can read/backfill).
+
+## Write your own provider
+
+Start from a provider SDK. It implements the contract (NATS connection,
+presence and manifest, the job loop, tokens with a shared refresh lock, rate
+limits, claim-checked results) and ships the proto stubs, so a worker is the
+provider client, the mapping and a few handlers.
+
+| SDK | Install | Template |
+|---|---|---|
+| [cairn-provider-sdk-go](https://github.com/opencairn-org/cairn-provider-sdk-go) | `go get github.com/opencairn-org/cairn-provider-sdk-go@v0.7.1` | `examples/minimal` |
+| [cairn-provider-sdk-python](https://github.com/opencairn-org/cairn-provider-sdk-python) | the wheel of a [GitHub release](https://github.com/opencairn-org/cairn-provider-sdk-python/releases), as a `[tool.uv.sources]` URL | `examples/minimal` |
+
+Both carry a test kit: a NATS server bootstrapped like core, fake core
+responders, and core's import rules applied to every result. The Go SDK also
+has an end-to-end harness that runs a worker and its mock provider against a
+real core. The Strava (Go) and Garmin (Python) workers are the reference
+implementations.
+
+An SDK's major.minor follows core's: SDK 0.7.x implements the 0.7 contract,
+and a worker built on it releases as 0.7.x too.
+
+Any other language works as well: generate the `cairn.v1` +
+`cairn.worker.v1` stubs from the proto contract, implement the job loop, and
+declare a capability manifest.
+
+The normative checklist of everything a compliant worker MUST implement —
+required consumers, heartbeats, claim-checked results, failure envelopes,
+reconcile semantics — is the
+[provider contract](/architecture/provider-contract), verifiable mechanically
+with cairn-core's `worker-conformance` harness.
+
+:::info[Standalone by design]
+Each worker is a standalone repository with its own build and release cycle,
+and none imports core. The SDKs are libraries over the wire format; the
+contract is still the wire format, so a worker without an SDK is just as
+valid.
+:::

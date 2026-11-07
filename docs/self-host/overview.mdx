@@ -51,6 +51,23 @@ providers, object storage, reverse proxy and worker authentication you want
 and copy the resulting `docker-compose.yml` and `.env`. Pin the image tags to
 a release rather than `latest`, and upgrade core and the workers together.
 
+## Upgrading to 0.7.2
+
+Replace the core image; migration 00076 runs on start (it adds a column, no
+rewrite). There are no worker releases, the 0.7.1 workers stay.
+
+- **MCP clients connect.** Claude.ai and other clients built on the MCP
+  TypeScript SDK never finished connecting to 0.7.1: `GET /mcp` answered
+  `401`, which they take for a rejected token. See
+  [MCP server](/integrations/mcp#protocol).
+- **MCP clients re-authorize once.** Tokens are now bound to the API or to
+  `/mcp` ([Resource indicators](/integrations/oauth#resource-indicators)).
+  Tokens issued before carry no resource and count as API tokens, so the
+  apps keep working and MCP clients sign in again.
+- **`CAIRN_HTTP_PUBLIC_BASE_URL` must be the URL clients use.** The MCP
+  metadata names `<base>/mcp` as the resource, and clients refuse metadata
+  whose resource is not the URL they connected to.
+
 ## Upgrading to 0.7.1
 
 Replace the core image; no migration runs. The Strava and Garmin workers

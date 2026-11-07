@@ -46,12 +46,30 @@ Cairn publishes standard metadata so clients can configure themselves:
 - **Authorization Server Metadata** (RFC 8414):
   `GET /.well-known/oauth-authorization-server`, including
   `scopes_supported`.
-- **Protected Resource Metadata** (RFC 9728):
-  `GET /.well-known/oauth-protected-resource` — points resources (the API, the
-  MCP endpoint) at this authorization server.
+- **Protected Resource Metadata** (RFC 9728), one document per resource,
+  each pointing at this authorization server:
+  `GET /.well-known/oauth-protected-resource` for the API (`resource` is the
+  base URL) and `GET /.well-known/oauth-protected-resource/mcp` for the
+  [MCP endpoint](/integrations/mcp) (`resource` is `<base>/mcp`, scopes
+  limited to what its tools use).
 - **Instance info** for a server picker: `AuthService.GetInstanceInfo` is
   public and returns the release, commit and build time, whether federation
   and OAuth are on, whether registration is open and the scope catalog.
+
+## Resource indicators
+
+Since 0.7.2 every token is bound to one resource (RFC 8707). The authorize,
+token and refresh requests take an optional `resource` parameter:
+
+| `resource` | Token is accepted by |
+| --- | --- |
+| omitted, or the base URL | the REST and Connect API |
+| `<base>/mcp` | the MCP endpoint only |
+
+Any other value, or more than one, is refused with `invalid_target`. A token
+request may repeat the `resource` of the authorization but not change it, and
+a refreshed token keeps the resource of the one it replaces. Clients that send
+no `resource` (the native apps, the device grant) get API tokens as before.
 
 ## Scopes
 

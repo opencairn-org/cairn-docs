@@ -1,0 +1,83 @@
+---
+id: mcp
+title: MCP server (agents)
+sidebar_position: 2
+---
+
+# MCP server
+
+Cairn exposes a **Model Context Protocol** server so AI agents can work with
+your activity data — scoped to your account, over OAuth, read-only by default.
+
+## Endpoint & auth
+
+- Endpoint: `https://<your-cairn>/mcp` (Streamable HTTP transport).
+- The MCP server is an **OAuth-protected resource** with its own
+  [protected-resource metadata](/integrations/oauth#discovery) at
+  `/.well-known/oauth-protected-resource/mcp`. The client runs Authorization
+  Code + PKCE (with Dynamic Client Registration) against Cairn's authorization
+  server and calls `/mcp` with a bearer access token.
+- The token must be **issued for the MCP endpoint**: the client names
+  `https://<your-cairn>/mcp` as `resource` (RFC 8707) when it authorizes and
+  redeems the code, as the MCP specification requires. `/mcp` refuses a token
+  issued for the API, and the API refuses a token issued for `/mcp`. See
+  [Resource indicators](/integrations/oauth#resource-indicators).
+- Every tool call is executed **as the authenticated user**, bounded by the
+  token's scopes.
+
+## Connecting an agent
+
+Point an MCP-capable client at the endpoint; OAuth is automatic:
+
+```jsonc
+// example MCP client config
+{
+  "mcpServers": {
+    "cairn": {
+      "url": "https://cairn.example/mcp"
+      // OAuth (PKCE + DCR) is handled by the client; it asks for
+      // activities:read and profile:read
+    }
+  }
+}
+```
+
+## Tools (read-only)
+
+The current tool set is read-only — safe to hand to an assistant. Each tool is
+gated on the token's scope and runs as the token's user:
+
+| Tool | Scope | Description |
+| --- | --- | --- |
+| `list_activities` | `activities:read` | your most recent activities (newest first; `limit` arg) |
+| `get_activity` | `activities:read` | full detail for one activity (owner-only) |
+| `activity_stats` | `activities:read` | lifetime totals: count, distance, moving time, elevation |
+| `personal_records` | `activities:read` | your current personal records / best efforts |
+| `profile` | `profile:read` | your profile + unit/locale preferences |
+
+Writes (creating manual activities, edits, social actions) are not exposed.
+
+## Protocol
+
+Streamable HTTP, JSON-RPC 2.0. The server implements `initialize`,
+`tools/list`, `tools/call` and `ping`. Every answer is a single JSON response;
+there is no server-to-client stream, so an authenticated `GET /mcp` gets
+`405 Method Not Allowed` (since 0.7.2; before, it got `401` and clients such
+as Claude.ai kept re-authorizing).
+
+A request without a valid bearer token gets `401` with:
+
+```
+WWW-Authenticate: Bearer resource_metadata="https://<your-cairn>/.well-known/oauth-protected-resource/mcp"
+```
+
+which is how the client discovers the authorization server and begins OAuth.
+When a token was sent but is expired, revoked or issued for another resource,
+the header adds `error="invalid_token"`.
+
+## Security notes
+
+- Read-only tools + per-user scoping mean an agent can summarize and analyze but
+  not change or delete anything.
+- Revoke an agent any time under **Settings → Authorized apps** — its tokens
+  stop working immediately, see [Authorized apps](/integrations/oauth#authorized-apps).

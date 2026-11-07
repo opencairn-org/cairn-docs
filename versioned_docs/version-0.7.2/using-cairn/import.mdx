@@ -1,0 +1,85 @@
+---
+id: import
+title: Importing activities
+sidebar_position: 1
+---
+
+# Importing activities
+
+Cairn pulls activities from four kinds of source, all funneled through one
+ingest pipeline:
+
+- **Strava** — connect your Strava app on the **Connections** screen; the
+  worker backfills history, receives webhooks for new activities and syncs
+  your [gear](/using-cairn/gear).
+- **Garmin** — connect with your Garmin credentials; the worker syncs
+  activities, [gear](/using-cairn/gear) and health metrics (HRV, sleep,
+  weight, steps, resting HR).
+- **File upload** — drag a `.gpx`, `.tcx` or `.fit` file (or several).
+- **Manual entry** — log a workout by hand (`POST /api/activities/manual`).
+
+Each provider account is an **external account**; you can link multiple
+accounts of the same provider.
+
+## What happens on import
+
+Every source — worker push, file upload, or manual create — goes through the
+same path:
+
+1. **Ingest** — identity-dedup, then persist the source + its stream atomically.
+2. **Re-cluster** — fuzzy-match and group sources that are the same workout.
+3. **Merge** — produce the activity by merging all sources (see
+   [Merging sources](/using-cairn/merge)).
+4. **Follow-ups** — best-efforts, segment matching + ranks, training load, and
+   PR notifications. Follow-ups never fail the durable ingest.
+
+So the same run recorded on a watch and on a phone, or imported from two
+providers, becomes **one activity** with the best data from each.
+
+## Live updates
+
+Imports show up as they land: the web UI listens to a per-user event
+stream of import, reimport, activity, source and PR events
+(`ActivityService.StreamActivityEvents` on Connect, with a heartbeat every
+30 seconds). Native clients can subscribe to the same stream instead of
+polling.
+
+## Re-importing with a preview
+
+A source can be re-parsed at any time, from the archived provider payload or
+by fetching it again (**Manage → sources → Reimport**). Since 0.6.0 the API
+can also stage the result first: `POST
+/api/activities/{id}/sources/{sourceId}/preview` runs the re-parse into a
+**preview** row and returns a field-level diff, both against the source and
+against the merged activity, without touching either. `GET
+/api/source-previews/{id}` shows it, `POST /api/source-previews/{id}/commit`
+applies it, `DELETE` discards it. A preview expires after one hour. On
+Connect this is `PreviewSourceReimport`, `GetSourcePreview` and
+`CommitSourcePreview`.
+
+## Uploading from a native client
+
+Besides the multipart `POST /api/activities/upload`, native clients can
+upload in two steps: `PresignActivityUpload` returns a 15-minute PUT URL,
+the client puts the file there and `UploadActivity` ingests it. The URL
+points at the object store when `CAIRN_STORAGE_PUBLIC_ENDPOINT` is set and at
+core's own `PUT /content/{token}` otherwise, so the flow works on every
+deployment.
+
+## Removing things
+
+- **Delete an activity**: `DELETE /api/activities/{id}` (or
+  `ActivityService.DeleteActivity`) soft-deletes it. Every source is detached
+  and denylisted so the next sync does not bring it back, and remote
+  followers are told. Soft-deleted activities are kept for 30 days before
+  an administrator's purge removes them for good, see
+  [Administration](/self-host/administration#maintenance-operations).
+- **Remove an external account**: `DELETE /api/accounts/{id}` detaches its
+  sources, re-merges the activities that have other sources, and deletes the
+  queue, import history, gear records and mirrored segments of the account.
+  Activities that had no other source are soft-deleted only when the request
+  carries `delete_exclusive_activities: true`; otherwise they stay as they
+  are.
+- **Rotate a webhook token**: `POST /api/accounts/{id}/webhook-token/rotate`
+  replaces the per-account signing secret of provider webhooks. The
+  subscription itself is owned by the worker and needs no re-registration.

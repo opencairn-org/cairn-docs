@@ -37,12 +37,12 @@
     "@docusaurus/types": "3.10.2",
     "@eslint/js": "10.0.1",
     "audit-ci": "7.1.0",
-    "eslint": "10.14.0",
+    "eslint": "10.15.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.14.0",
-    "knip": "6.44.1",
+    "knip": "6.45.1",
     "license-checker-rseidelsohn": "5.0.1",
-    "prettier": "3.9.10"
+    "prettier": "3.10.1"
   },
   "browserslist": {
     "production": [
@@ -63,8 +63,8 @@
     "serialize-javascript": "^7.0.5",
     "tinypool": "^2.2.0",
     "uuid": "^14.0.0",
-    "postcss-selector-parser": "^7.1.6",
-    "follow-redirects": "^1.16.1",
+    "postcss-selector-parser": "^7.2.1",
+    "follow-redirects": "^1.16.3",
     "launch-editor": "^2.14.2"
   }
 }

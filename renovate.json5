@@ -54,6 +54,12 @@
       groupName: 'npm dependencies (non-major)',
     },
     {
+      description: 'Entries under "overrides" are version floors for transitive dependencies. Renovate updates a version inside such a range with `npm install <name>@<version>`, which npm refuses (EOVERRIDE) and which left the whole group without a lock file. Raising the floor in package.json instead goes through a plain `npm install`.',
+      matchManagers: ['npm'],
+      matchDepTypes: ['overrides'],
+      rangeStrategy: 'bump',
+    },
+    {
       description: 'Actions digest/non-major bumps are low risk behind the check workflow.',
       matchManagers: ['github-actions'],
       matchUpdateTypes: ['minor', 'patch', 'pin', 'digest'],

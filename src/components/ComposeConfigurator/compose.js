@@ -5,8 +5,8 @@
 // and docker-compose.dev.yml.
 const IMAGES = {
   postgres: 'timescale/timescaledb-ha:pg17-ts2.27',
-  nats: 'nats:2.15.1-alpine',
-  minio: 'minio/minio:RELEASE.2025-09-07T16-13-09Z',
+  nats: 'nats:2.15.3-alpine',
+  minio: 'pgsty/silo:RELEASE.2026-11-12T00-00-00Z',
   caddy: 'caddy:2.11.7-alpine',
 };
 

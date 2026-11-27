@@ -157,6 +157,7 @@ function Steps({o}) {
 const RELEASE_TAGS = {
   '0.6.1': {core: 'v0.6.1', strava: 'v0.6.0', garmin: 'v0.6.0'},
   '0.7.2': {core: 'v0.7.2', strava: 'v0.7.1', garmin: 'v0.7.1'},
+  '0.7.4': {core: 'v0.7.4', strava: 'v0.7.2', garmin: 'v0.7.1'},
 };
 
 function releaseTags(version) {
@@ -164,7 +165,7 @@ function releaseTags(version) {
   return RELEASE_TAGS[version] ?? {core: tag, strava: tag, garmin: tag};
 }
 
-export default function ComposeConfigurator({defaultRelease = 'v0.7.2'}) {
+export default function ComposeConfigurator({defaultRelease = 'v0.7.4'}) {
   const version = useDocsVersion();
   const release =
     version.version === 'current'

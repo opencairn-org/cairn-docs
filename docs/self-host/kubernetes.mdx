@@ -19,7 +19,7 @@ deploy/k8s/
   secrets.example.yaml  copy to secrets.yaml and fill in; do not commit
   postgres.yaml         TimescaleDB StatefulSet + headless Service + 20Gi PVC
   nats.yaml             NATS + JetStream StatefulSet (max_payload 8MB) + 5Gi PVC
-  minio.yaml            MinIO StatefulSet + 20Gi PVC (the server creates the bucket)
+  minio.yaml            MinIO (Silo) StatefulSet + 20Gi PVC (the server creates the bucket)
   migrate-job.yaml      one-shot `cairn migrate up`
   core.yaml             cairn-core Deployment + Service (:80 -> :8080)
   worker-strava.yaml    Strava worker Deployment

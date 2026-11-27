@@ -17,7 +17,7 @@ MinIO and a TLS-terminating reverse proxy. Everything core needs is in the
 Pick your options and copy the two files below. They change as you click, and
 the **First start** steps underneath match what you picked.
 
-<ComposeConfigurator defaultRelease="v0.7.2" />
+<ComposeConfigurator defaultRelease="v0.7.4" />
 
 ## What runs
 
@@ -28,7 +28,7 @@ the **First start** steps underneath match what you picked.
 | `worker-garmin` | `ghcr.io/opencairn-org/cairn-provider-garmin` | Garmin imports. Keeps its Garth token cache in `garmin_tokens`, runs as uid 10001 |
 | `postgres` | `timescale/timescaledb-ha` | Postgres 17 with TimescaleDB and PostGIS |
 | `nats` | `nats` | JetStream job and result bus; config is inlined as a compose `configs` entry |
-| `minio` | `minio/minio` | S3-compatible store for raw files, photos and map snapshots; core creates the bucket |
+| `minio` | `pgsty/silo` | S3-compatible store (Silo, the community-maintained MinIO fork) for raw files, photos and map snapshots; core creates the bucket |
 | `caddy` | `caddy` | Reverse proxy with automatic TLS for `CAIRN_DOMAIN` |
 
 The workers never talk to Postgres or S3; they reach core through NATS, which

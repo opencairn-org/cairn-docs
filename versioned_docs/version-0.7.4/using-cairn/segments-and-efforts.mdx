@@ -1,0 +1,79 @@
+---
+id: segments-and-efforts
+title: Segments & best-efforts
+sidebar_position: 5
+---
+
+# Segments & best-efforts
+
+## Segments
+
+Cairn matches every activity with a GPS track against segments using
+PostGIS. Each matched effort is timed and ranked, producing leaderboards
+(KOM/QOM-style) across the users of your instance. Matching is a follow-up
+of every import, re-import, upload and manual entry, and it works off the
+stored stream: a Garmin activity matches a segment that arrived from Strava
+and vice versa.
+
+Segments come from two places:
+
+- **Provider segments** (`source: external`) arrive with imported activities;
+  Strava segment efforts reference their segment, and Cairn keeps the
+  geometry and the provider reference. A provider-reported effort never adds
+  a second row: on a GPS-bearing source the matcher owns the efforts and the
+  provider's id is stamped onto the overlapping one, so leaderboards cannot
+  double-count.
+- **Native segments** (`source: native`) are yours. Since 0.6.0 you create
+  them from a polyline, either **private** (only your efforts) or shared with
+  the whole **instance** (`scope: private` or `instance`). Each segment has
+  its own matching tolerances (corridor, start and end tolerance, default
+  15 m / 25 m / 25 m) and can be **bidirectional**. A new or edited segment
+  can **backfill**: a background job re-matches your existing activities of
+  that type.
+
+Native authoring is on the API and Connect (`SegmentService`); the web UI
+lists segments, shows one with your efforts and its leaderboard, and lets
+you star it, but has no segment editor yet.
+
+| Call | What |
+| --- | --- |
+| `GET /api/segments`, `GET /api/segments/{id}` | your segments landing page and one segment with your efforts |
+| `GET /api/segments/browse?sources=&scopes=&types=&with_efforts=&starred=&q=&sort=` | search across provider, private and instance segments; sort by name, distance, elevation, effort count or creation |
+| `GET /api/segments/bbox?min_lat=&min_lon=&max_lat=&max_lon=` | segments inside a map viewport (`include_instance=true` adds shared ones) |
+| `POST /api/segments` | create: `name`, `activity_type`, `polyline` (+ `precision`), `scope`, tolerances, `bidirectional`, `backfill` |
+| `PUT /api/segments/{id}` | edit any of the above, `starred`; a new polyline re-matches |
+| `DELETE /api/segments/{id}?keep_efforts=` | remove it, with or without its efforts |
+| `GET /api/segments/{id}/efforts?sort=fastest\|newest&user_id=&from=&to=` | efforts on a segment |
+| `GET /api/segments/{id}/leaderboard?from=&to=` | fastest effort per user, optionally within a period |
+| `POST /api/segments/{id}/rematch`, `POST /api/activities/{id}/rematch-segments` | re-run matching for one segment or one activity |
+
+Administrators can re-match the whole instance, see
+[Maintenance operations](/self-host/administration#maintenance-operations).
+
+## Best-efforts
+
+For supported activity types, Cairn automatically detects best efforts over
+standard distances and durations from your stream data and tracks
+**personal records**. New PRs trigger notifications as part of the import
+follow-ups. Browse them under **Best-efforts** and **Records** in the web UI.
+
+### Custom windows
+
+Since 0.6.0 you can add your own windows next to the standard set: "my
+7.5 km loop", "90-minute power", "20-minute heart rate". A window is one
+activity type, one metric (`pace`, `speed`, `power`, `heart_rate` or `vam`)
+and either a **distance** (100 m to 500 km) or a **duration** (5 s to
+24 h). Creating one backfills it over your activities of that type, and it
+is then computed on every import like the built-in windows.
+
+| Call | What |
+| --- | --- |
+| `GET /api/records`, `GET /api/best-efforts/history` | current records, and how a record evolved |
+| `GET /api/records/custom` | your custom windows |
+| `POST /api/records/custom` | `activity_type`, `metric`, `window_kind` (`distance` or `duration`), `window_value` (metres or seconds), `label` |
+| `DELETE /api/records/custom/{id}` | remove a window and its efforts |
+| `GET /api/activities/{id}/segment-efforts` | the segment efforts of one activity |
+
+On Connect the same lives on `SegmentService` and `ActivityService`
+(`ListRecords`, `ListCustomBestEfforts`, `CreateCustomBestEffort`,
+`DeleteCustomBestEffort`).

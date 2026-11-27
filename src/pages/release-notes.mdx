@@ -14,10 +14,59 @@ Since 0.3.0 core and both workers are tagged together. The worker contract
 (`cairn.worker.v1`) changes only with a core minor; a worker needs the same
 `major.minor` as core before 1.0.
 
+## 0.7.4
+
+**2026-11-20** · **Components:** cairn-core v0.7.4 (the 0.7.3 workers and
+SDKs stay) · [documentation](/)
+
+**Upgrade:** replace the core image; no migration, no configuration change.
+A Compose file that runs the bundled `minio/minio` image needs a new image
+once that one is no longer cached. See
+[Upgrading to 0.7.4](/self-host/overview#upgrading-to-074).
+
+- Server streams work over HTTP. From 0.6.0, where they were added, to
+  0.7.3, `StreamActivityEvents`, `StreamNotifications` and
+  `StreamAdminEvents` answered `200` with a single error frame
+  (`*main.statusWriter does not implement http.Flusher`) and closed. They now
+  stay open and are exempt from `CAIRN_HTTP_WRITE_TIMEOUT`, as documented.
+  The web app does not use them and was not affected.
+- The three streams send their headers as soon as the subscription is in
+  place, not with the first event or heartbeat up to 30 s later.
+- The bundled object store is
+  [Silo](https://hub.docker.com/r/pgsty/silo), the community-maintained
+  MinIO fork (`pgsty/silo:RELEASE.2026-11-12T00-00-00Z`), in the Compose
+  configurator, the Kubernetes bundle and the dev stack. The pinned
+  `minio/minio` image can no longer be pulled. Silo keeps the S3 API, the
+  `MINIO_*` variables and the health routes.
+
+Changelog: [core](https://github.com/opencairn-org/cairn-core/blob/v0.7.4/CHANGELOG.md)
+
+## 0.7.3
+
+**2026-11-20** · **Components:** cairn-core v0.7.3 · cairn-provider-strava
+v0.7.2 · cairn-provider-sdk-go v0.7.3 (the 0.7.1 Garmin worker and Python SDK
+stay) · [documentation](/) (no snapshot of its own, covered by 0.7.4)
+
+**Upgrade:** replace the core and Strava images; no migration, no change to
+the API or the configuration.
+
+- Security: core and the Strava worker are built with Go 1.27.4, which fixes
+  a crash of HTTP/1 servers caused by a header race in `net/http`'s
+  `MaxBytesReader` (GO-2026-6859, CVE-2026-97054), and with
+  `golang.org/x/crypto` 0.59.0 (GO-2026-5932).
+- Dependency updates in core (pgx, goose, nats-server, go-jose, the AWS SDK
+  for S3) and the web app (SvelteKit 3.2, Tailwind CSS 4.3, Vite 8.3).
+- cairn-provider-sdk-go 0.7.3 is the same code as 0.7.2, whose release
+  workflow did not finish; 0.7.3 carries the signed source archive.
+
+Changelogs: [core](https://github.com/opencairn-org/cairn-core/blob/v0.7.3/CHANGELOG.md) ·
+[strava](https://github.com/opencairn-org/cairn-provider-strava/blob/v0.7.2/CHANGELOG.md) ·
+[sdk-go](https://github.com/opencairn-org/cairn-provider-sdk-go/blob/v0.7.3/CHANGELOG.md)
+
 ## 0.7.2
 
 **2026-11-07** · **Components:** cairn-core v0.7.2 (the 0.7.1 workers and
-SDKs stay) · [documentation](/)
+SDKs stay) · [documentation](/0.7.2/)
 
 **Upgrade:** replace the core image; migration 00076 runs on start. MCP
 clients sign in once more. See
@@ -40,7 +89,7 @@ Changelog: [core](https://github.com/opencairn-org/cairn-core/blob/v0.7.2/CHANGE
 
 **2026-11-06** · **Components:** cairn-core v0.7.1 · cairn-provider-strava v0.7.1 ·
 cairn-provider-garmin v0.7.1 · cairn-provider-sdk-go v0.7.1 ·
-cairn-provider-sdk-python v0.7.1 · [documentation](/)
+cairn-provider-sdk-python v0.7.1 · [documentation](/0.7.1/)
 
 **Upgrade:** replace the core image; no migration. The 0.7.1 workers are
 optional, 0.7.0 workers keep working. See

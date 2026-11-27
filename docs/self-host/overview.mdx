@@ -51,6 +51,26 @@ providers, object storage, reverse proxy and worker authentication you want
 and copy the resulting `docker-compose.yml` and `.env`. Pin the image tags to
 a release rather than `latest`, and upgrade core and the workers together.
 
+## Upgrading to 0.7.4
+
+Replace the core image; there is no migration and no configuration change.
+0.7.4 includes 0.7.3, whose security fixes (Go 1.27.4, `golang.org/x/crypto`
+0.59.0) also come with Strava worker 0.7.2. Replace that image too; the
+0.7.1 Garmin worker stays.
+
+- **Server streams work.** `StreamActivityEvents`, `StreamNotifications` and
+  `StreamAdminEvents` closed after one error frame in every release from
+  0.6.0 to 0.7.3. Clients that gave up on them or fell back to polling can
+  use them now. See [Importing activities](/using-cairn/import).
+- **The bundled MinIO image is gone.** `minio/minio` can no longer be
+  pulled, so a Compose file from the configurator before 0.7.4 fails on a
+  host that does not have the image cached. Change the `minio` service's
+  image to `pgsty/silo:RELEASE.2026-11-12T00-00-00Z` and keep everything
+  else (service name, volume, `MINIO_*` variables). Silo documents the same
+  on-disk format, but an existing MinIO volume was not tested against it:
+  back the volume up first. The Kubernetes bundle's `minio.yaml` needs the
+  same change.
+
 ## Upgrading to 0.7.2
 
 Replace the core image; migration 00076 runs on start (it adds a column, no

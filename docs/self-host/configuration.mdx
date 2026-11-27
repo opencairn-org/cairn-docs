@@ -157,9 +157,12 @@ list, presigned `GET` and `PUT` URLs, bucket creation and one lifecycle rule
 (`PutBucketLifecycleConfiguration`), so check that last one against a store
 you have not seen Cairn run on.
 
-- **MinIO** is what the Compose configurator and the Kubernetes bundle ship:
-  one container, one volume, path-style addressing. Core does not need the
-  management console, so the 2025 community builds without it are fine.
+- **MinIO** is what the Compose configurator and the Kubernetes bundle ship,
+  as [Silo](https://hub.docker.com/r/pgsty/silo) (`pgsty/silo`), the
+  community-maintained fork, since the `minio/minio` images can no longer be
+  pulled: one container, one volume, path-style addressing. Silo keeps the
+  S3 API, the `MINIO_*` variables and the health routes. Core does not need
+  the management console.
 - **Garage** is a lighter single-binary store that suits small instances and
   low-power hardware. Path-style, same env as MinIO.
 - **A managed bucket** (AWS S3, Hetzner Object Storage, …) removes the extra
